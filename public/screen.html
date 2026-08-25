@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UNI.VERRE — Plateau</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rubik:wght@400;600;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="screen.css" />
+</head>
+<body>
+  <div id="stage">
+    <div id="boardWrap">
+      <svg id="board" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+
+    <aside id="side">
+      <header id="sideHead">
+        <h1>UNI.VERRE</h1>
+        <div id="seedTag"></div>
+      </header>
+      <div id="turnbox"></div>
+      <div id="playersPanel"></div>
+      <div id="rulesPanel" class="hidden">
+        <h3>📜 Règles inventées</h3>
+        <ul id="rulesList"></ul>
+      </div>
+      <div id="statusPanel"></div>
+      <div id="feed"></div>
+    </aside>
+  </div>
+
+  <!-- Overlays -->
+  <div id="diceOverlay" class="overlay hidden"><div id="diceCube"></div><div id="diceWho"></div></div>
+  <div id="duelOverlay" class="overlay hidden">
+    <div class="duelSide" id="duelA"></div>
+    <div class="duelVs">⚔️</div>
+    <div class="duelSide" id="duelB"></div>
+  </div>
+  <div id="cardOverlay" class="overlay hidden">
+    <div id="cardFlip">
+      <div class="cardFace cardBack">🃏</div>
+      <div class="cardFace cardFront">
+        <div id="cardIcon"></div>
+        <div id="cardTitle"></div>
+        <div id="cardText"></div>
+      </div>
+    </div>
+  </div>
+  <div id="medusaOverlay" class="overlay hidden">
+    <div class="bigWord">🪼 MÉDUSE</div>
+    <div id="medusaCount"></div>
+    <div class="subWord">Baissez la tête… puis levez les yeux EN MÊME TEMPS.<br/>Deux regards qui se croisent = 1 shot chacun !</div>
+  </div>
+  <div id="freezeOverlay" class="overlay hidden">
+    <div class="bigWord frost">🥶 FREEZE</div>
+    <div class="subWord">Quand le décideur s'arrête de bouger,<br/>le dernier à s'immobiliser boit !</div>
+  </div>
+  <div id="takeover" class="tk-hidden">
+    <div id="tkIcon"></div>
+    <img id="tkAvatar" alt="" />
+    <div id="tkText"></div>
+  </div>
+  <div id="boomFlash" class="hidden"></div>
+  <canvas id="confetti" class="hidden"></canvas>
+  <button id="soundBtn" class="hidden" onclick="this.classList.add('hidden')">🔊 Activer le son</button>
+
+  <div id="lobby">
+    <div class="lobbyCard">
+      <h1 class="lobbyTitle">UNI.VERRE</h1>
+      <p class="lobbySub">Le jeu de plateau qui hydrate — chaque plateau est unique 🎲</p>
+      <img id="qr" alt="QR code" />
+      <div id="joinUrl"></div>
+      <svg id="lobbyTable" viewBox="0 0 560 340"></svg>
+      <div id="lobbySeated"></div>
+      <p class="lobbyHint">📱 Scannez, prenez-vous en photo, puis <b>tapez sur votre place autour de la table</b> (telle que vous êtes assis).<br/>
+      Le 1er joueur 👑 peut <b>régénérer le plateau</b> et <b>lancer la partie</b> depuis son téléphone.</p>
+    </div>
+  </div>
+
+  <div id="overScreen" class="hidden">
+    <h1>🏆 ARRIVÉE !</h1>
+    <div id="podium"></div>
+    <div id="uniFinal"></div>
+    <div id="finalStats"></div>
+    <p class="lobbyHint">Le 1er joueur peut relancer une partie (nouveau plateau) depuis son téléphone.</p>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="screen.js"></script>
+</body>
+</html>

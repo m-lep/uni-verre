@@ -1,0 +1,9 @@
+# Blueprint Render — https://render.com/docs/blueprint-spec
+# Sur Render : New + → Blueprint → sélectionner ce dépôt.
+services:
+  - type: web
+    name: uni-verre
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start

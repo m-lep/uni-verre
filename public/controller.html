@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>UNI.VERRE — Manette</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rubik:wght@400;600;800&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Rubik', system-ui, sans-serif;
+      color: #f7e8c3;
+      background: linear-gradient(160deg, #4a2f1c, #241209);
+      display: flex; flex-direction: column;
+      padding: 14px; gap: 12px;
+      user-select: none; -webkit-user-select: none;
+      overflow: hidden;
+    }
+    h1 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 3px; color: #e8c877; text-align: center; }
+    .hidden { display: none !important; }
+    button {
+      font-family: 'Rubik', sans-serif; font-weight: 800; color: #241209;
+      background: linear-gradient(160deg, #f2d68a, #d8a94f);
+      border: none; border-radius: 16px; padding: 16px;
+      font-size: 18px; cursor: pointer;
+      box-shadow: 0 4px 0 #8a6a2f;
+    }
+    button:active { transform: translateY(3px); box-shadow: 0 1px 0 #8a6a2f; }
+    button:disabled { opacity: .4; }
+    button.ghost { background: rgba(255,255,255,.12); color: #f7e8c3; box-shadow: 0 4px 0 rgba(0,0,0,.4); }
+    button.danger { background: linear-gradient(160deg, #ff8a5c, #e0502c); color: #fff; box-shadow: 0 4px 0 #7a2810; }
+    input[type=text] {
+      font-size: 18px; padding: 14px; border-radius: 14px; border: 2px solid #e8c877;
+      background: rgba(0,0,0,.3); color: #f7e8c3; width: 100%;
+    }
+
+    /* ——— Inscription ——— */
+    #joinView { display: flex; flex-direction: column; gap: 16px; align-items: center; justify-content: center; flex: 1; }
+    #joinView h1 { font-size: 60px; }
+    #photoBtn {
+      width: 140px; height: 140px; border-radius: 50%;
+      border: 4px dashed #e8c877; background: rgba(255,255,255,.08);
+      color: #f7e8c3; font-size: 15px; font-weight: 600;
+      display: flex; align-items: center; justify-content: center; text-align: center;
+      overflow: hidden; padding: 0; box-shadow: none;
+    }
+    #photoBtn img { width: 100%; height: 100%; object-fit: cover; }
+    #joinBtn { width: 100%; font-size: 22px; }
+    #joinErr { color: #ff9d7a; font-size: 14px; text-align: center; }
+
+    /* ——— En jeu ——— */
+    #gameView { display: none; flex-direction: column; gap: 10px; flex: 1; min-height: 0; }
+    #meCard {
+      display: flex; align-items: center; gap: 12px;
+      background: rgba(0,0,0,.35); border-radius: 16px; padding: 8px 12px;
+    }
+    #meCard img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 3px solid #e8c877; }
+    #meName { font-weight: 800; font-size: 17px; }
+    #meStats { display: flex; gap: 6px; margin-top: 3px; flex-wrap: wrap; }
+    #meStats span { background: rgba(255,255,255,.1); border-radius: 8px; padding: 2px 8px; font-size: 13px; font-weight: 600; }
+    #meTotal { font-size: 11px; opacity: .6; margin-top: 2px; }
+
+    /* main de cartes */
+    #hand { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+    .cardBtn {
+      flex: 0 0 auto; width: 92px; min-height: 96px;
+      background: linear-gradient(160deg, #cdb2ff, #9a72e8); color: #2c1548;
+      border-radius: 12px; padding: 8px 6px; font-size: 11px; font-weight: 800;
+      box-shadow: 0 4px 0 #4a2a8a; text-align: center;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+    }
+    .cardBtn .ci { font-size: 26px; }
+    .cardBtn.win { background: linear-gradient(160deg, #ffe9a8, #e8c877); box-shadow: 0 4px 0 #8a6a2f; animation: pulse .6s infinite; }
+    .cardBtn.inactive { opacity: .45; }
+
+    #actionZone { flex: 1; display: flex; flex-direction: column; gap: 12px; justify-content: center; min-height: 0; overflow: auto; }
+    #actionLabel { text-align: center; font-size: 18px; font-weight: 600; line-height: 1.4; }
+
+    #rollBtn { font-size: 42px; padding: 32px; border-radius: 28px; animation: pulse 1.2s infinite; }
+    @keyframes pulse { 50% { transform: scale(1.04); } }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .pickBtn {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      background: rgba(255,255,255,.1); color: #f7e8c3;
+      box-shadow: 0 4px 0 rgba(0,0,0,.4); font-size: 15px;
+    }
+    .pickBtn img { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; }
+    .pickBtn.sel { outline: 3px solid #e8c877; background: rgba(232, 200, 119, .25); }
+
+    .distRow { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,.08); border-radius: 14px; padding: 8px 12px; }
+    .distRow img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; }
+    .distRow .dn { flex: 1; font-weight: 600; }
+    .distRow button { width: 44px; height: 44px; font-size: 24px; padding: 0; border-radius: 12px; }
+    .distRow .dv { width: 28px; text-align: center; font-size: 21px; font-weight: 800; }
+    #distLeft { text-align: center; font-size: 16px; font-weight: 600; }
+
+    #waitBox { text-align: center; opacity: .85; font-size: 17px; line-height: 1.5; }
+    #waitBox .big { font-size: 40px; }
+
+    .panel { border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+    #motPanel { background: rgba(130, 90, 200, .25); border: 1px solid #b48aff; }
+    #defPanel { background: rgba(255, 150, 60, .16); border: 2px solid #ff9d5c; animation: pulse 1s infinite; }
+    #corbeauPanel { background: rgba(200, 120, 200, .16); border: 2px solid #d98ad9; }
+    #freezePanel { background: rgba(79, 195, 247, .18); border: 2px solid #4fc3f7; }
+    #collectPanel { background: rgba(232, 160, 60, .18); border: 2px solid #e8a83c; }
+    #votePanel { background: rgba(232, 160, 60, .18); border: 2px solid #e8a83c; }
+    .panel .vq { text-align: center; font-size: 15.5px; font-weight: 600; line-height: 1.4; }
+    .panel .vbtns { display: flex; gap: 10px; }
+    .panel .vbtns button { flex: 1; font-size: 16px; }
+    .panel .tally { text-align: center; font-size: 13.5px; opacity: .85; }
+    .stars { display: flex; gap: 6px; justify-content: center; }
+    .stars button { flex: 1; font-size: 18px; padding: 12px 0; }
+
+    /* table du lobby */
+    #seatWrap { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+    #seatTitle { font-size: 16px; font-weight: 600; text-align: center; }
+    #seatSvg { width: 100%; max-width: 360px; }
+    .seat { cursor: pointer; }
+    .seat circle.spot { fill: rgba(255,255,255,.10); stroke: rgba(232,200,119,.6); stroke-width: 2; stroke-dasharray: 4 4; }
+    .seat.free:active circle.spot { fill: rgba(232,200,119,.35); }
+    .seat.mine circle.spot { fill: rgba(232,200,119,.30); stroke: #e8c877; stroke-dasharray: none; stroke-width: 3; }
+    .seat.taken circle.spot { stroke-dasharray: none; }
+
+    #hostZone { display: flex; flex-direction: column; gap: 10px; }
+
+    #cardSheet {
+      position: fixed; inset: 0; z-index: 20;
+      background: rgba(10, 5, 2, .8); backdrop-filter: blur(3px);
+      display: flex; flex-direction: column; justify-content: flex-end;
+    }
+    #cardSheetInner {
+      background: linear-gradient(160deg, #3a2413, #241209);
+      border-top: 3px solid #e8c877; border-radius: 22px 22px 0 0;
+      padding: 20px 16px 26px; display: flex; flex-direction: column; gap: 12px;
+      max-height: 80vh; overflow: auto;
+    }
+    #cardSheetTitle { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px; color: #cdb2ff; text-align: center; }
+    #cardSheetText { text-align: center; font-size: 15px; line-height: 1.4; }
+    #cellGrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+    #cellGrid button { padding: 10px 0; font-size: 15px; }
+
+    #toast {
+      position: fixed; left: 12px; right: 12px; bottom: 14px;
+      background: #201008f0; border: 1px solid #e8c877; border-radius: 14px;
+      padding: 12px 16px; font-size: 15px; text-align: center;
+      transition: opacity .3s; opacity: 0; pointer-events: none; z-index: 30;
+    }
+    #toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="joinView">
+    <h1>UNI.VERRE</h1>
+    <button id="photoBtn">📸<br/>Prends-toi<br/>en photo</button>
+    <input type="file" id="photoInput" accept="image/*" capture="user" class="hidden" />
+    <input type="text" id="nameInput" placeholder="Ton pseudo" maxlength="16" />
+    <button id="joinBtn">REJOINDRE 🍻</button>
+    <div id="joinErr"></div>
+  </div>
+
+  <div id="gameView">
+    <div id="meCard">
+      <img id="meAvatar" alt="" />
+      <div style="flex:1">
+        <div id="meName"></div>
+        <div id="meStats"></div>
+        <div id="meTotal"></div>
+      </div>
+    </div>
+    <div id="hand"></div>
+    <div id="defPanel" class="panel hidden"></div>
+    <div id="corbeauPanel" class="panel hidden"></div>
+    <div id="freezePanel" class="panel hidden"></div>
+    <div id="motPanel" class="panel hidden"></div>
+    <div id="collectPanel" class="panel hidden"></div>
+    <div id="votePanel" class="panel hidden"></div>
+    <div id="actionZone"></div>
+    <div id="hostZone"></div>
+  </div>
+
+  <div id="cardSheet" class="hidden"></div>
+  <div id="toast"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const $ = id => document.getElementById(id);
+    let avatar = null;
+    let you = null;
+    let joined = false;
+
+    // ——— Photo → avatar 256px ———
+    $('photoBtn').addEventListener('click', () => $('photoInput').click());
+    $('photoInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const img = new Image();
+      img.onload = () => {
+        const S = 256;
+        const c = document.createElement('canvas');
+        c.width = S; c.height = S;
+        const ctx = c.getContext('2d');
+        const side = Math.min(img.width, img.height);
+        ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, S, S);
+        avatar = c.toDataURL('image/jpeg', 0.82);
+        $('photoBtn').innerHTML = '<img src="' + avatar + '"/>';
+        URL.revokeObjectURL(img.src);
+      };
+      img.src = URL.createObjectURL(file);
+    });
+
+    function join() {
+      const name = $('nameInput').value.trim();
+      if (!name) { $('joinErr').textContent = 'Il te faut un pseudo !'; return; }
+      localStorage.setItem('uniName', name);
+      if (avatar) localStorage.setItem('uniAvatar', avatar);
+      socket.emit('join', { name, avatar });
+    }
+    $('joinBtn').addEventListener('click', join);
+    $('nameInput').value = localStorage.getItem('uniName') || '';
+    const savedAvatar = localStorage.getItem('uniAvatar');
+    if (savedAvatar) { avatar = savedAvatar; $('photoBtn').innerHTML = '<img src="' + avatar + '"/>'; }
+
+    socket.on('joined', () => {
+      joined = true;
+      $('joinView').style.display = 'none';
+      $('gameView').style.display = 'flex';
+    });
+    socket.on('join-refused', msg => { $('joinErr').textContent = msg; });
+    socket.on('connect', () => {
+      if (joined) socket.emit('join', { name: localStorage.getItem('uniName'), avatar });
+    });
+
+    // ——— Toasts ———
+    let toastTimer = null;
+    socket.on('event', ev => {
+      $('toast').textContent = (ev.icon || '') + ' ' + ev.text;
+      $('toast').classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => $('toast').classList.remove('show'), 3200);
+      if (ev.kind === 'drink' && you && ev.playerId === you.me.id && navigator.vibrate) navigator.vibrate([120, 60, 120]);
+    });
+
+    function esc(s) { return String(s).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c])); }
+    function pById(id) { return you.players.find(p => p.id === id); }
+    function av(p) {
+      if (p.avatar) return p.avatar;
+      const s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="' + (p.color || '#888') + '"/><text x="50" y="68" font-size="52" font-family="sans-serif" font-weight="bold" fill="#fff" text-anchor="middle">' + esc((p.name || '?')[0].toUpperCase()) + '</text></svg>';
+      return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(s)));
+    }
+
+    // ——— Rendu principal ———
+    socket.on('you', (data) => {
+      you = data;
+      renderMe();
+      renderHand();
+      renderDefense();
+      renderCorbeau();
+      renderFreeze();
+      renderMot();
+      renderCollect();
+      renderVote();
+      renderAction();
+      renderHost();
+    });
+
+    function renderMe() {
+      const me = you.me;
+      $('meAvatar').src = av(me);
+      $('meName').textContent = me.name + (you.isHost ? ' 👑' : '');
+      $('meStats').innerHTML =
+        '<span>🍺 ' + me.gorgees + '</span>' +
+        '<span>🥃 ' + me.shots + '</span>' +
+        (me.finis ? '<span>🍻 ' + me.finis + '</span>' : '') +
+        (me.frozen ? '<span>❄️ gelé·e</span>' : '');
+      $('meTotal').textContent = 'Total soirée : ' + me.totalGorgees + ' gorgées · ' + me.totalShots + ' shots';
+    }
+
+    // ——— Main de cartes ———
+    // tap court = jouer, appui long (~0,5 s) = voir ce que fait la carte
+    function renderHand() {
+      const cards = you.hand || [];
+      $('hand').innerHTML = cards.map((c, i) => {
+        const isWin = c.kind === 'window';
+        let usable = you.phase === 'playing' && !you.collect && !you.vote && (!isWin || you.shieldWindow);
+        if (c.id === 'rejoue') usable = usable && you.myPending && you.myPending.type === 'roll';
+        return '<button class="cardBtn ' + (isWin && you.shieldWindow ? 'win' : '') + (usable ? '' : ' inactive') + '" data-idx="' + i + '" data-usable="' + (usable ? 1 : 0) + '">' +
+          '<span class="ci">' + c.icon + '</span>' + esc(c.title) + '</button>';
+      }).join('');
+      for (const btn of document.querySelectorAll('#hand .cardBtn')) {
+        const idx = parseInt(btn.dataset.idx, 10);
+        const usable = btn.dataset.usable === '1';
+        let timer = null, longFired = false;
+        const startHold = () => { longFired = false; timer = setTimeout(() => { longFired = true; showCardInfo(idx); if (navigator.vibrate) navigator.vibrate(25); }, 480); };
+        const endHold = () => clearTimeout(timer);
+        btn.addEventListener('pointerdown', startHold);
+        btn.addEventListener('pointerup', endHold);
+        btn.addEventListener('pointerleave', endHold);
+        btn.addEventListener('contextmenu', e => e.preventDefault());
+        btn.addEventListener('click', () => {
+          if (longFired) { longFired = false; return; }
+          if (usable) openCard(idx); else showCardInfo(idx); // inactive : tap = info
+        });
+      }
+    }
+
+    window.showCardInfo = (i) => {
+      const c = (you.hand || [])[i];
+      if (!c) return;
+      const sheet = $('cardSheet');
+      sheet.innerHTML = '<div id="cardSheetInner"><div id="cardSheetTitle">' + c.icon + ' ' + esc(c.title) + '</div>' +
+        '<div id="cardSheetText">' + esc(c.text) + '</div>' +
+        (c.kind === 'window' ? '<div id="cardSheetText" style="opacity:.7">Cette carte se propose automatiquement quand tu reçois à boire.</div>' : '') +
+        '<button class="ghost" onclick="closeSheet()">FERMER</button></div>';
+      sheet.classList.remove('hidden');
+    };
+
+    window.openCard = (i) => {
+      const c = (you.hand || [])[i];
+      if (!c) return;
+      const sheet = $('cardSheet');
+      let body = '';
+      const close = '<button class="ghost" onclick="closeSheet()">ANNULER</button>';
+      if (!c.needs) {
+        body = '<button onclick="playCard(\'' + c.id + '\', {})">JOUER ' + c.icon + '</button>' + close;
+      } else if (c.needs === 'player') {
+        const opts = you.players.filter(p => p.id !== you.me.id);
+        body = '<div class="grid">' + opts.map(p =>
+          '<button class="pickBtn" onclick="playCard(\'' + c.id + '\', {target:' + p.id + '})"><img src="' + av(p) + '"/>' + esc(p.name) + '</button>').join('') + '</div>' + close;
+      } else if (c.needs === 'pair') {
+        window._pair = [];
+        const opts = you.players;
+        body = '<div class="vq">Choisis DEUX joueurs à menotter</div><div class="grid" id="pairGrid">' + opts.map(p =>
+          '<button class="pickBtn" data-id="' + p.id + '" onclick="togglePair(this)"><img src="' + av(p) + '"/>' + esc(p.name) + '</button>').join('') + '</div>' +
+          '<button id="pairGo" disabled onclick="playCard(\'' + c.id + '\', {a:window._pair[0], b:window._pair[1]})">MENOTTER ⛓️</button>' + close;
+      } else if (c.needs === 'cell') {
+        const N = you.board.length;
+        const occupied = new Set(you.players.map(p => p.pos));
+        const trapped = new Set(you.traps || []);
+        const cells = [];
+        for (let k = 1; k <= N - 2; k++) if (!occupied.has(k) && !trapped.has(k)) cells.push(k);
+        body = '<div class="vq">Choisis la case à piéger (vide)</div><div id="cellGrid">' + cells.map(k =>
+          '<button class="ghost" onclick="playCard(\'' + c.id + '\', {cell:' + k + '})">' + (k + 1) + '</button>').join('') + '</div>' + close;
+      } else if (c.needs === 'message') {
+        body = '<div class="vq">Écris ton message anonyme. Tu l\'enverras à l\'écran quand tu voudras.</div>' +
+          '<input type="text" id="corbeauIn" maxlength="90" autocomplete="off" placeholder="Ton message…"/>' +
+          '<button onclick="sendCorbeauCard(\'' + c.id + '\')">GARDER LE CORBEAU 💌</button>' + close;
+      } else if (c.needs === 'alloc') {
+        window._dist = {}; window._distMax = 5;
+        const opts = you.players.filter(p => p.id !== you.me.id);
+        body = '<div id="distLeft">Reste : <b id="leftN">5</b></div>' +
+          opts.map(p =>
+            '<div class="distRow"><img src="' + av(p) + '"/><div class="dn">' + esc(p.name) + '</div>' +
+            '<button class="ghost" onclick="distAdj(' + p.id + ', -1)">−</button>' +
+            '<div class="dv" id="dv-' + p.id + '">0</div>' +
+            '<button onclick="distAdj(' + p.id + ', 1)">+</button></div>').join('') +
+          '<button id="distGo" disabled onclick="playCard(\'' + c.id + '\', {alloc: window._dist})">DISTRIBUER 🫗</button>' + close;
+      }
+      sheet.innerHTML = '<div id="cardSheetInner"><div id="cardSheetTitle">' + c.icon + ' ' + esc(c.title) + '</div>' +
+        '<div id="cardSheetText">' + esc(c.text) + '</div>' + body + '</div>';
+      sheet.classList.remove('hidden');
+    };
+    window.closeSheet = () => $('cardSheet').classList.add('hidden');
+    window.sendCorbeauCard = (id) => {
+      const text = $('corbeauIn').value.trim();
+      if (!text) return;
+      playCard(id, { text });
+    };
+    window.playCard = (id, payload) => {
+      socket.emit('use-card', { id, payload });
+      closeSheet();
+    };
+    window.togglePair = (btn) => {
+      const id = parseInt(btn.dataset.id, 10);
+      const i = window._pair.indexOf(id);
+      if (i >= 0) { window._pair.splice(i, 1); btn.classList.remove('sel'); }
+      else if (window._pair.length < 2) { window._pair.push(id); btn.classList.add('sel'); }
+      const go = $('pairGo');
+      if (go) go.disabled = window._pair.length !== 2;
+    };
+    window.distAdj = (id, d) => {
+      const cur = window._dist[id] || 0;
+      const total = Object.values(window._dist).reduce((a, b) => a + b, 0);
+      if (d > 0 && total >= window._distMax) return;
+      const next = Math.max(0, cur + d);
+      window._dist[id] = next;
+      $('dv-' + id).textContent = next;
+      const newTotal = Object.values(window._dist).reduce((a, b) => a + b, 0);
+      $('leftN').textContent = window._distMax - newTotal;
+      const go = $('distGo');
+      if (go) go.disabled = newTotal !== window._distMax;
+    };
+
+    // ——— Défense : proposée pile au moment où tu reçois à boire ———
+    let defDismissed = 0; // ts du dernier "je bois" assumé
+    function renderDefense() {
+      const panel = $('defPanel');
+      const ld = you.myLastDrink;
+      const hasShield = (you.hand || []).some(c => c.id === 'bouclier');
+      const hasMirror = (you.hand || []).some(c => c.id === 'miroir');
+      if (!ld || (!hasShield && !hasMirror) || ld.ts === defDismissed || you.phase !== 'playing') {
+        panel.classList.add('hidden'); return;
+      }
+      panel.classList.remove('hidden');
+      const what = [ld.g ? ld.g + ' gorgée' + (ld.g > 1 ? 's' : '') : '', ld.s ? ld.s + ' shot' + (ld.s > 1 ? 's' : '') : '']
+        .filter(Boolean).join(' + ');
+      panel.innerHTML = '<div class="vq">🍺 Tu viens de recevoir <b>' + what + '</b>' +
+        (ld.source ? ' <span style="opacity:.7">(' + esc(ld.source) + ')</span>' : '') + ' !</div>' +
+        '<div class="vbtns">' +
+        (hasShield ? '<button onclick="defShield(' + ld.ts + ')">🛡️ J\'ANNULE</button>' : '') +
+        (hasMirror ? '<button onclick="defMirror()">🪞 JE RENVOIE</button>' : '') +
+        '</div>' +
+        '<button class="ghost" onclick="defDrink(' + ld.ts + ')">Je bois 💪</button>';
+    }
+    window.defShield = (ts) => { defDismissed = 0; socket.emit('use-card', { id: 'bouclier', payload: {} }); };
+    window.defDrink = (ts) => { defDismissed = ts; renderDefense(); };
+    window.defMirror = () => {
+      const panel = $('defPanel');
+      const opts = you.players.filter(p => p.id !== you.me.id);
+      panel.innerHTML = '<div class="vq">🪞 Sur qui renvoies-tu tout ça ?</div>' +
+        '<div class="grid3">' + opts.map(p =>
+          '<button class="pickBtn" onclick="socket.emit(\'use-card\', {id:\'miroir\', payload:{target:' + p.id + '}})"><img src="' + av(p) + '"/>' + esc(p.name) + '</button>'
+        ).join('') + '</div>' +
+        '<button class="ghost" onclick="renderDefense()">Retour</button>';
+    };
+    window.renderDefense = renderDefense;
+
+    // ——— Corbeau écrit, prêt à partir quand tu veux ———
+    function renderCorbeau() {
+      const panel = $('corbeauPanel');
+      if (!you.myCorbeau || you.phase !== 'playing') { panel.classList.add('hidden'); return; }
+      panel.classList.remove('hidden');
+      panel.innerHTML = '<div class="vq">💌 Ton corbeau est prêt :<br/>« ' + esc(you.myCorbeau) + ' »</div>' +
+        '<button onclick="socket.emit(\'send-corbeau\')">ENVOYER À L\'ÉCRAN 🕶</button>';
+    }
+
+    // ——— Freeze (le poseur peut déclencher à tout moment) ———
+    function renderFreeze() {
+      const panel = $('freezePanel');
+      if (!you.freezeMine || you.phase !== 'playing') { panel.classList.add('hidden'); return; }
+      panel.classList.remove('hidden');
+      panel.innerHTML = '<div class="vq">🥶 FREEZE armé — arrête-toi de bouger quand tu veux, puis appuie :</div>' +
+        '<button class="danger" onclick="socket.emit(\'freeze-now\')">⚡ J\'AI FREEZÉ !</button>';
+    }
+
+    // ——— Mot interdit : tout le monde peut balancer ———
+    function renderMot() {
+      const panel = $('motPanel');
+      const mi = you.motInterdit;
+      if (!mi || you.phase !== 'playing' || you.collect) { panel.classList.add('hidden'); return; }
+      panel.classList.remove('hidden');
+      const opts = you.players.filter(p => p.id !== you.me.id);
+      panel.innerHTML = '<div class="vq">🤫 Mot interdit : « <b>' + esc(mi.word) + '</b> »<br/>Quelqu\'un l\'a dit ? Balance :</div>' +
+        '<div class="grid3">' + opts.map(p =>
+          '<button class="pickBtn" onclick="socket.emit(\'mot-report\', ' + p.id + ')"><img src="' + av(p) + '"/>💥 ' + esc(p.name) + '</button>'
+        ).join('') + '</div>';
+    }
+
+    // ——— Décisions collectives ———
+    function renderCollect() {
+      const panel = $('collectPanel');
+      const c = you.myCollect;
+      const cc = you.collect;
+      if (!cc) { panel.classList.add('hidden'); return; }
+      panel.classList.remove('hidden');
+      if (!c) {
+        const waiting = (cc.waitingIds || []).map(id => { const p = pById(id); return p ? p.name : '?'; }).join(', ');
+        panel.innerHTML = '<div class="vq">🗳️ ' + esc(cc.prompt || 'Décision en cours…') + '</div>' +
+          '<div class="tally">Réponses : ' + cc.answered + '/' + cc.total + (waiting ? ' — on attend ' + esc(waiting) : '') + '</div>';
+        return;
+      }
+      let body = '';
+      const meta = c.meta || {};
+      switch (c.purpose) {
+        case 'meduse': {
+          const opts = you.players.filter(p => p.id !== you.me.id);
+          body = '<button class="ghost" onclick="answer(null)">🙈 ZÉRO eye contact</button>' +
+            '<div class="vq" style="opacity:.8">…ou qui as-tu regardé ?</div>' +
+            '<div class="grid3">' + opts.map(p =>
+              '<button class="pickBtn" onclick="answer(' + p.id + ')"><img src="' + av(p) + '"/>👀 ' + esc(p.name) + '</button>').join('') + '</div>';
+          break;
+        }
+        case 'accusation': case 'compliments':
+          body = '<div class="vbtns"><button onclick="answer(\'oui\')">OUI ✔</button>' +
+            '<button class="ghost" onclick="answer(\'non\')">NON ✘</button></div>';
+          break;
+        case 'bdf': {
+          const a = pById(meta.aId), b = pById(meta.bId);
+          body = '<div class="vbtns">' +
+            '<button class="pickBtn" onclick="answer(' + meta.aId + ')"><img src="' + (a ? av(a) : '') + '"/>' + (a ? esc(a.name) : '?') + '</button>' +
+            '<button class="pickBtn" onclick="answer(' + meta.bId + ')"><img src="' + (b ? av(b) : '') + '"/>' + (b ? esc(b.name) : '?') + '</button></div>';
+          break;
+        }
+        case 'freeze': case 'valise': {
+          const opts = you.players;
+          body = '<div class="grid3">' + opts.map(p =>
+            '<button class="pickBtn" onclick="answer(' + p.id + ')"><img src="' + av(p) + '"/>' + esc(p.name) + '</button>').join('') + '</div>' +
+            '<button class="ghost" onclick="answer(null)">Personne 😇</button>';
+          break;
+        }
+        case 'imite':
+          body = '<div class="stars">' + [0, 1, 2, 3, 4, 5].map(n =>
+            '<button class="ghost" onclick="answer(' + n + ')">' + n + '⭐</button>').join('') + '</div>';
+          break;
+        case 'pret':
+          body = '<button style="font-size:26px;padding:26px" onclick="answer(\'ok\')">✅ JE SUIS PRÊT·E</button>';
+          break;
+      }
+      panel.innerHTML = '<div class="vq">🗳️ ' + esc(c.prompt) + '</div>' + body;
+    }
+    window.answer = (v) => socket.emit('collect-answer', v);
+
+    // ——— Vote tèj ———
+    function renderVote() {
+      const panel = $('votePanel');
+      const v = you.vote;
+      if (!v) { panel.classList.add('hidden'); return; }
+      panel.classList.remove('hidden');
+      const target = pById(v.targetId);
+      const tname = target ? esc(target.name) : '?';
+      const why = v.reason === 'offline' ? 'est déconnecté·e' : 'ne joue pas';
+      const tally = '<div class="tally">🚪 Tèj : ' + v.tej + ' · 🕰 Attend : ' + v.wait + ' (' + (v.tej + v.wait) + '/' + v.total + ' votes)</div>';
+      if (v.targetId === you.me.id) {
+        panel.innerHTML = '<div class="vq">🗳️ Les autres votent sur ton sort… joue vite !</div>' + tally;
+        return;
+      }
+      if (!you.isVoter) { panel.innerHTML = '<div class="vq">🗳️ Vote en cours sur ' + tname + '…</div>' + tally; return; }
+      if (you.myVote) {
+        panel.innerHTML = '<div class="vq">🗳️ Tu as voté « ' + (you.myVote === 'tej' ? '🚪 On le tèj' : '🕰 On attend') + ' »</div>' + tally;
+        return;
+      }
+      panel.innerHTML = '<div class="vq">🗳️ ' + tname + ' ' + why + ' — on fait quoi ?</div>' +
+        '<div class="vbtns">' +
+        '<button class="ghost" onclick="socket.emit(\'vote\', \'wait\')">🕰 ON ATTEND</button>' +
+        '<button class="danger" onclick="socket.emit(\'vote\', \'tej\')">🚪 ON LE TÈJ</button>' +
+        '</div>' + tally;
+    }
+
+    // ——— Zone d'action (tour de jeu / lobby) ———
+    function renderAction() {
+      const zone = $('actionZone');
+      const pend = you.myPending;
+      if (you.phase === 'lobby') { renderSeats(zone); return; }
+      if (you.phase === 'over') {
+        zone.innerHTML = '<div id="waitBox"><div class="big">🏁</div>Partie terminée ! Regarde le podium sur l\'écran.</div>';
+        return;
+      }
+      if (you.collect) { zone.innerHTML = ''; return; }
+      if (!pend) {
+        const turnP = pById(you.turn);
+        zone.innerHTML = '<div id="waitBox"><div class="big">🍹</div>Au tour de <b>' + (turnP ? esc(turnP.name) : '…') + '</b></div>';
+        return;
+      }
+      switch (pend.type) {
+        case 'roll':
+          zone.innerHTML = '<button id="rollBtn" onclick="socket.emit(\'roll\')">🎲 LANCE LE DÉ</button>';
+          break;
+        case 'ok':
+          zone.innerHTML = '<div id="actionLabel">' + esc(pend.label || 'À toi de jouer !') + '</div>' +
+            '<button onclick="socket.emit(\'ok\')">C\'EST FAIT ✔</button>';
+          break;
+        case 'text':
+          zone.innerHTML = '<div id="actionLabel">' + esc(pend.label) + '</div>' +
+            '<input type="text" id="textIn" maxlength="80" autocomplete="off"/>' +
+            '<button onclick="sendText()">VALIDER ✔</button>';
+          break;
+        case 'pick': {
+          const opts = (pend.options || []).map(id => pById(id)).filter(Boolean);
+          zone.innerHTML = '<div id="actionLabel">' + esc(pend.label || 'Choisis un joueur') + '</div>' +
+            '<div class="grid">' + opts.map(p =>
+              '<button class="pickBtn" onclick="socket.emit(\'pick\', ' + p.id + ')"><img src="' + av(p) + '"/>' + esc(p.name) + '</button>'
+            ).join('') + '</div>' +
+            (pend.allowNone ? '<button class="ghost" onclick="socket.emit(\'pick\', null)">Personne 😇</button>' : '');
+          break;
+        }
+        case 'distribute': {
+          const opts = you.players.filter(p => p.id !== you.me.id);
+          window._dist = {}; window._distMax = pend.n;
+          zone.innerHTML = '<div id="actionLabel">🫗 Distribue ' + pend.n + ' gorgées</div>' +
+            '<div id="distLeft">Reste : <b id="leftN">' + pend.n + '</b></div>' +
+            opts.map(p =>
+              '<div class="distRow"><img src="' + av(p) + '"/><div class="dn">' + esc(p.name) + '</div>' +
+              '<button class="ghost" onclick="distAdjPending(' + p.id + ', -1)">−</button>' +
+              '<div class="dv" id="dv-' + p.id + '">0</div>' +
+              '<button onclick="distAdjPending(' + p.id + ', 1)">+</button></div>'
+            ).join('') +
+            '<button id="distGo" disabled onclick="socket.emit(\'distribute\', window._dist)">ENVOYER 🍺</button>';
+          break;
+        }
+      }
+    }
+    window.distAdjPending = (id, d) => window.distAdj(id, d);
+    window.sendText = () => {
+      const v = $('textIn').value.trim();
+      if (v) socket.emit('text-submit', v);
+    };
+
+    // ——— Table du lobby : choisis ta place en tapant dessus ———
+    function renderSeats(zone) {
+      const S = you.seats || 12;
+      const W = 360, H = 260, cx = W / 2, cy = H / 2, rx = 128, ry = 86;
+      const seatEls = [];
+      for (let i = 0; i < S; i++) {
+        const a = (i / S) * Math.PI * 2 - Math.PI / 2;
+        const x = cx + Math.cos(a) * rx;
+        const y = cy + Math.sin(a) * ry;
+        const p = you.players.find(pl => pl.seat === i);
+        const mine = p && p.id === you.me.id;
+        const cls = mine ? 'mine' : p ? 'taken' : 'free';
+        let inner = '<circle class="spot" cx="' + x + '" cy="' + y + '" r="22"/>';
+        if (p) {
+          inner += '<clipPath id="sc' + i + '"><circle cx="' + x + '" cy="' + y + '" r="19"/></clipPath>' +
+            '<image href="' + av(p) + '" x="' + (x - 19) + '" y="' + (y - 19) + '" width="38" height="38" clip-path="url(#sc' + i + ')" preserveAspectRatio="xMidYMid slice"/>' +
+            '<circle cx="' + x + '" cy="' + y + '" r="21" fill="none" stroke="' + p.color + '" stroke-width="3"/>' +
+            '<text x="' + x + '" y="' + (y + 34) + '" font-size="10" fill="#f7e8c3" text-anchor="middle" font-weight="600">' + esc(p.name.slice(0, 8)) + '</text>';
+        }
+        seatEls.push('<g class="seat ' + cls + '" onclick="pickSeat(' + i + ', ' + (p && !mine ? 'true' : 'false') + ')">' + inner + '</g>');
+      }
+      const seated = you.me.seat !== null && you.me.seat !== undefined;
+      zone.innerHTML = '<div id="seatWrap">' +
+        '<div id="seatTitle">' + (seated ? '✅ Tu es installé·e ! (tape ailleurs pour changer)' : '🪑 <b>Tape sur ta place</b> autour de la table, là où tu es assis·e') + '</div>' +
+        '<svg id="seatSvg" viewBox="0 0 ' + W + ' ' + H + '">' +
+        '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + (rx - 34) + '" ry="' + (ry - 26) + '" fill="#55371f" stroke="#e8c877" stroke-width="3"/>' +
+        '<ellipse cx="' + cx + '" cy="' + (cy - 4) + '" rx="' + (rx - 42) + '" ry="' + (ry - 32) + '" fill="#6a4527"/>' +
+        '<text x="' + cx + '" y="' + (cy + 6) + '" font-size="18" fill="#e8c877" text-anchor="middle" font-family="Bebas Neue" letter-spacing="2">UNI.VERRE</text>' +
+        seatEls.join('') + '</svg></div>';
+    }
+    window.pickSeat = (i, taken) => {
+      if (taken) return;
+      socket.emit('seat', i);
+      if (navigator.vibrate) navigator.vibrate(30);
+    };
+
+    function renderHost() {
+      const zone = $('hostZone');
+      if (!you.isHost) { zone.innerHTML = ''; return; }
+      if (you.phase === 'lobby') {
+        const ready = you.allSeated;
+        zone.innerHTML = '<button class="ghost" onclick="socket.emit(\'new-board\')">🎲 NOUVEAU PLATEAU</button>' +
+          '<button onclick="socket.emit(\'start\')" ' + (ready ? '' : 'disabled') + '>▶ COMMENCER' + (ready ? '' : ' (tout le monde doit s\'asseoir)') + '</button>';
+      } else if (you.phase === 'over') {
+        zone.innerHTML = '<button onclick="socket.emit(\'replay\')">🔄 REJOUER (nouveau plateau)</button>';
+      } else zone.innerHTML = '';
+    }
+  </script>
+</body>
+</html>

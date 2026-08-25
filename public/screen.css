@@ -1,0 +1,279 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --cream: #f7e8c3;
+  --gold: #e8c877;
+  --wood1: #5a3a22;
+  --wood2: #3c2515;
+  --wood3: #2a1810;
+}
+
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  font-family: 'Rubik', system-ui, sans-serif;
+  color: var(--cream);
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(255, 200, 120, .10), transparent 55%),
+    repeating-linear-gradient(93deg, rgba(0,0,0,.10) 0 3px, transparent 3px 26px),
+    linear-gradient(160deg, var(--wood1), var(--wood2) 55%, var(--wood3));
+}
+
+#stage { display: flex; height: 100vh; }
+
+#boardWrap { flex: 1; position: relative; min-width: 0; }
+#board { width: 100%; height: 100%; display: block; }
+
+#board text {
+  font-family: 'Bebas Neue', 'Rubik', sans-serif;
+  fill: var(--cream);
+  text-anchor: middle;
+  pointer-events: none;
+  letter-spacing: .5px;
+}
+
+/* ——— Sidebar ——— */
+#side {
+  width: 285px; flex: none;
+  display: flex; flex-direction: column; gap: 9px;
+  padding: 12px;
+  background: linear-gradient(180deg, rgba(0,0,0,.45), rgba(0,0,0,.62));
+  border-left: 2px solid rgba(232, 200, 119, .35);
+  overflow: hidden;
+}
+
+#sideHead { display: flex; align-items: baseline; justify-content: space-between; }
+#sideHead h1 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 30px; letter-spacing: 2px; color: var(--gold);
+  text-shadow: 0 2px 0 #000;
+}
+#seedTag { font-size: 11px; opacity: .5; }
+
+#turnbox {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(232, 200, 119, .12);
+  border: 1px solid rgba(232, 200, 119, .4);
+  border-radius: 12px; padding: 8px 11px;
+  min-height: 54px;
+}
+#turnbox img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 2.5px solid var(--gold); }
+#turnbox .t1 { font-size: 11.5px; opacity: .7; }
+#turnbox .t2 { font-family: 'Bebas Neue', sans-serif; font-size: 21px; letter-spacing: 1px; }
+
+#playersPanel { display: flex; flex-direction: column; gap: 8px; }
+.pcard {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,.06);
+  border-radius: 10px; padding: 5px 8px;
+  border-left: 4px solid transparent;
+  transition: background .3s;
+}
+.pcard.turn { background: rgba(232, 200, 119, .18); box-shadow: 0 0 0 1px rgba(232,200,119,.5); }
+.pcard.offline { opacity: .4; }
+.pcard img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+.pcard .pname { font-weight: 600; font-size: 13px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcard .pname .badges { font-size: 11px; }
+.pcard .pstats { display: flex; gap: 5px; font-size: 12px; font-weight: 600; }
+.pcard .pstats span { background: rgba(0,0,0,.35); border-radius: 7px; padding: 1px 6px; white-space: nowrap; }
+
+#rulesPanel {
+  background: rgba(130, 90, 200, .18);
+  border: 1px solid rgba(190, 150, 255, .4);
+  border-radius: 12px; padding: 10px 12px;
+}
+#rulesPanel h3 { font-size: 12.5px; margin-bottom: 5px; }
+#rulesPanel li { font-size: 11.5px; margin-left: 16px; margin-bottom: 2px; }
+
+#statusPanel { display: flex; flex-direction: column; gap: 6px; }
+.statusChip {
+  font-size: 11.5px; padding: 5px 8px; border-radius: 9px; line-height: 1.4;
+  background: rgba(255, 120, 120, .15); border: 1px solid rgba(255, 120, 120, .4);
+}
+
+#feed {
+  margin-top: auto; overflow: hidden;
+  display: flex; flex-direction: column-reverse; gap: 5px;
+  min-height: 90px;
+}
+.feedItem { font-size: 10.5px; opacity: .75; line-height: 1.35; }
+.feedItem:first-child { opacity: 1; font-size: 11.5px; }
+
+/* ——— Annonce plein écran : chaque action bloque l'écran qq secondes ——— */
+#takeover {
+  position: fixed; inset: 0; z-index: 45;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+  background: rgba(12, 6, 3, .78);
+  backdrop-filter: blur(4px);
+  text-align: center; padding: 40px;
+  transition: opacity .25s;
+  --tkc: var(--gold);
+  animation: tkIn .4s cubic-bezier(.2, 1.4, .4, 1);
+}
+#takeover.tk-hidden { opacity: 0; pointer-events: none; animation: none; }
+@keyframes tkIn { from { opacity: 0; transform: scale(1.06); } }
+#tkIcon { font-size: 110px; line-height: 1; filter: drop-shadow(0 8px 24px rgba(0,0,0,.6)); }
+#tkAvatar {
+  width: 130px; height: 130px; border-radius: 50%; object-fit: cover;
+  border: 5px solid var(--tkc); box-shadow: 0 0 44px color-mix(in srgb, var(--tkc) 55%, transparent);
+}
+#tkText {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(40px, 5vw, 64px); letter-spacing: 3px; line-height: 1.15;
+  color: #fff3d6; text-shadow: 0 4px 0 #000;
+  max-width: 26ch; text-wrap: balance;
+}
+#takeover.tk-drink { --tkc: #ff9d5c; background: rgba(30, 10, 4, .82); }
+#takeover.tk-card { --tkc: #cdb2ff; background: rgba(18, 9, 32, .82); }
+#takeover.tk-status { --tkc: #a8dcff; background: rgba(6, 16, 28, .82); }
+#takeover.tk-uni { --tkc: #6adcb8; background: rgba(5, 22, 17, .82); }
+#takeover.tk-win { --tkc: var(--gold); }
+#takeover.tk-move, #takeover.tk-action { --tkc: var(--gold); }
+#takeover.tk-info { --tkc: #cfbd97; background: rgba(12, 6, 3, .7); }
+
+/* ——— Overlays ——— */
+.overlay {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center; gap: 40px;
+  background: rgba(10, 5, 2, .72);
+  backdrop-filter: blur(3px);
+}
+.hidden { display: none !important; }
+
+#diceCube {
+  width: 170px; height: 170px; border-radius: 28px;
+  background: linear-gradient(145deg, #fffbe8, #e8d9b0);
+  color: #201008; font-size: 110px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,.7), inset 0 -6px 0 rgba(0,0,0,.15);
+}
+#diceCube.rolling { animation: diceShake .12s infinite; }
+@keyframes diceShake { 0% { transform: rotate(-8deg) } 50% { transform: rotate(8deg) } 100% { transform: rotate(-8deg) } }
+#diceWho { position: absolute; bottom: 18%; font-family: 'Bebas Neue', sans-serif; font-size: 36px; letter-spacing: 2px; }
+
+.duelSide { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.duelSide img { width: 110px; height: 110px; border-radius: 50%; object-fit: cover; border: 4px solid var(--gold); }
+.duelSide .dname { font-family: 'Bebas Neue', sans-serif; font-size: 30px; }
+.duelSide .ddie {
+  width: 110px; height: 110px; border-radius: 20px;
+  background: #fffbe8; color: #201008; font-size: 70px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+}
+.duelSide .ddie.rolling { animation: diceShake .12s infinite; }
+.duelVs { font-size: 80px; }
+
+#cardFlip { width: 340px; height: 500px; perspective: 1200px; position: relative; }
+.cardFace {
+  position: absolute; inset: 0; border-radius: 24px;
+  backface-visibility: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; padding: 30px; text-align: center;
+  transition: transform .8s cubic-bezier(.3, 1.2, .4, 1);
+  box-shadow: 0 24px 70px rgba(0,0,0,.75);
+}
+.cardBack {
+  background: repeating-linear-gradient(45deg, #3a1d5e 0 18px, #2c1548 18px 36px);
+  border: 5px solid var(--gold);
+  font-size: 130px;
+  transform: rotateY(0deg);
+}
+.cardFront {
+  background: linear-gradient(160deg, #fdf3d8, #eeda9f);
+  color: #2c1548; border: 5px solid #3a1d5e;
+  transform: rotateY(-180deg);
+}
+#cardFlip.flipped .cardBack { transform: rotateY(180deg); }
+#cardFlip.flipped .cardFront { transform: rotateY(0deg); }
+#cardIcon { font-size: 90px; }
+#cardTitle { font-family: 'Bebas Neue', sans-serif; font-size: 42px; letter-spacing: 2px; }
+#cardText { font-size: 20px; font-weight: 600; line-height: 1.4; }
+
+#medusaOverlay, #freezeOverlay { flex-direction: column; gap: 26px; text-align: center; }
+.bigWord { font-family: 'Bebas Neue', sans-serif; font-size: 130px; letter-spacing: 8px; color: var(--gold); text-shadow: 0 6px 0 #000; }
+.bigWord.frost { color: #a8dcff; }
+#medusaCount { font-size: 160px; font-weight: 800; color: #fff; }
+.subWord { font-size: 26px; line-height: 1.5; }
+#freezeOverlay { background: rgba(20, 50, 90, .8); }
+
+.trapBadge { animation: trapGlow 1.2s ease-in-out infinite; }
+@keyframes trapGlow { 50% { opacity: .55; } }
+
+#board .halo { pointer-events: none; }
+#board .halo.on { opacity: 1; animation: haloPulse 1.4s ease-in-out infinite; }
+@keyframes haloPulse { 0%, 100% { stroke-width: 3; opacity: .9; } 50% { stroke-width: 7; opacity: .35; } }
+
+#board .ripple {
+  fill: none; stroke: #ffe9b0; stroke-width: 4; r: 10;
+  animation: rippleOut .65s ease-out forwards; pointer-events: none;
+}
+@keyframes rippleOut { to { r: 52; stroke-width: 0.5; opacity: 0; } }
+
+@keyframes uniPop { 30% { font-size: 46px; } }
+
+#confetti { position: fixed; inset: 0; z-index: 65; pointer-events: none; }
+
+#soundBtn {
+  position: fixed; top: 16px; left: 16px; z-index: 80;
+  font-family: 'Rubik', sans-serif; font-weight: 800; font-size: 15px;
+  background: #e8c877; color: #241209; border: none; border-radius: 12px;
+  padding: 10px 16px; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.5);
+}
+
+body.shake { animation: bigShake .5s; }
+@keyframes bigShake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-14px, 6px); }
+  40% { transform: translate(12px, -8px); }
+  60% { transform: translate(-10px, -5px); }
+  80% { transform: translate(8px, 6px); }
+}
+
+#lobbyTable { width: min(560px, 80vw); }
+#lobbySeated { font-size: 16px; font-weight: 600; color: #ffd98a; }
+
+#boomFlash { position: fixed; inset: 0; background: #fff; z-index: 60; animation: boom .5s forwards; }
+@keyframes boom { from { opacity: 1 } to { opacity: 0 } }
+
+/* ——— Lobby & fin ——— */
+#lobby, #overScreen {
+  position: fixed; inset: 0; z-index: 70;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(255, 200, 120, .12), transparent 60%),
+    linear-gradient(160deg, #4a2f1cf2, #241209f8);
+  overflow: auto;
+}
+/* au lobby on laisse voir le plateau derrière (l'hôte peut le régénérer) */
+#lobby { background: rgba(20, 10, 5, .45); backdrop-filter: blur(2px); }
+.lobbyCard {
+  display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center;
+  background: linear-gradient(160deg, #3a2413f0, #201007f5);
+  border: 2px solid rgba(232, 200, 119, .5);
+  border-radius: 28px; padding: 34px 60px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.6);
+}
+.lobbyTitle { font-family: 'Bebas Neue', sans-serif; font-size: 110px; letter-spacing: 10px; color: var(--gold); text-shadow: 0 6px 0 #000; }
+.lobbySub { font-size: 22px; opacity: .85; }
+#qr { width: 240px; height: 240px; border-radius: 18px; border: 6px solid var(--gold); background: #fff; }
+#joinUrl { font-size: 26px; font-weight: 600; letter-spacing: 1px; color: #ffd98a; }
+
+.lobbyHint { font-size: 16px; opacity: .7; line-height: 1.6; text-align: center; }
+
+#overScreen h1 { font-family: 'Bebas Neue', sans-serif; font-size: 90px; color: var(--gold); letter-spacing: 6px; }
+#podium { display: flex; align-items: flex-end; gap: 24px; }
+.podiumSlot { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.podiumSlot img { border-radius: 50%; object-fit: cover; border: 4px solid var(--gold); }
+.podiumSlot .step {
+  width: 120px; border-radius: 10px 10px 0 0;
+  background: linear-gradient(180deg, var(--gold), #8a6a2f);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Bebas Neue', sans-serif; font-size: 40px; color: #201008;
+}
+#uniFinal { font-size: 26px; font-weight: 600; color: #ffbe7a; }
+#finalStats { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; max-width: 1000px; }
+.fstat {
+  background: rgba(255,255,255,.08); border-radius: 14px; padding: 12px 18px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 14px;
+}
+.fstat img { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; }
+.fstat b { font-size: 16px; }

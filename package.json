@@ -1,0 +1,21 @@
+{
+  "name": "uni-verre",
+  "version": "1.0.0",
+  "private": true,
+  "description": "UNI.VERRE — jeu de plateau apéro : le PC est le plateau, les téléphones sont les manettes.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
