@@ -372,6 +372,7 @@ function renderSide() {
       p.frozen ? '❄️' : '',
       p.benched ? '🚪' : '',
       p.boitPourTous ? '🐫' : '',
+      p.finished ? '🏁' : '',
       p.handCount ? `🃏×${p.handCount}` : '',
       p.ancre ? '⚓' : '',
       snap.motInterdit && snap.motInterdit.by === p.id ? '🤫' : '',
@@ -390,6 +391,9 @@ function renderSide() {
   $('rulesList').innerHTML = rules.map(r => `<li>« ${esc(r.text)} » <small>— ${esc(r.by)}</small></li>`).join('');
 
   const chips = [];
+  if (snap.noShots) {
+    chips.push('🚫🥃 Mode sans shots : chaque shot vaut 5 gorgées');
+  }
   // qui doit jouer / répondre en ce moment (toujours visible)
   if (snap.phase === 'playing') {
     if (snap.collect) {
@@ -574,9 +578,10 @@ function renderLobby() {
     <text x="${cx}" y="${cy + 8}" font-size="26" fill="#e8c877" text-anchor="middle" font-family="Bebas Neue, sans-serif" letter-spacing="3">UNI.VERRE</text>
     ${seats}`;
   const seated = snap.players.filter(p => p.seat !== null && p.seat !== undefined).length;
-  $('lobbySeated').textContent = snap.players.length
+  const nb = snap.players.length
     ? `${seated}/${snap.players.length} joueur${snap.players.length > 1 ? 's' : ''} installé${seated > 1 ? 's' : ''} à table`
     : '';
+  $('lobbySeated').innerHTML = nb + (snap.noShots ? '<br/><span style="color:#ff9d7a">🚫🥃 Mode sans shots : chaque shot vaudra 5 gorgées</span>' : '');
 }
 
 

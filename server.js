@@ -73,6 +73,7 @@ for (const k of Object.keys(COLLECT_MS)) {
 
 let seed = Math.floor(Math.random() * 1e9);
 let game = null;
+const lobbySettings = { noShots: false }; // réglé par l'hôte au lobby
 let players = []; // persiste entre les parties
 let nextPlayerId = 1;
 
@@ -88,7 +89,7 @@ function resetGame() {
   for (const p of players) {
     p.pos = 0; p.gorgees = 0; p.shots = 0; p.finis = 0;
     p.frozen = 0; p.hand = []; p.boitPourTous = false; p.benched = false;
-    p.corbeau = null; p.ancre = false;
+    p.corbeau = null; p.ancre = false; p.finished = false;
   }
 }
 
@@ -98,7 +99,7 @@ function publicPlayer(p) {
     seat: p.seat === undefined ? null : p.seat,
     pos: p.pos || 0, gorgees: p.gorgees || 0, shots: p.shots || 0, finis: p.finis || 0,
     frozen: p.frozen || 0, boitPourTous: !!p.boitPourTous, benched: !!p.benched,
-    ancre: !!p.ancre,
+    ancre: !!p.ancre, finished: !!p.finished,
     handCount: (p.hand || []).length,
     totalGorgees: p.totalGorgees || 0, totalShots: p.totalShots || 0,
   };
@@ -130,6 +131,7 @@ function snapshot() {
     chains: game ? game.chains.map(c => ({ a: c.a, b: c.b })) : [],
     traps: game ? game.traps.map(t => t.cell) : [],
     corbeaux: game ? game.corbeaux.map(c => c.text) : [],
+    noShots: game ? game.noShots : lobbySettings.noShots,
     vote: game && game.vote ? {
       targetId: game.vote.targetId,
       reason: game.vote.reason,
@@ -189,8 +191,18 @@ function event(ev) {
 
 function byId(id) { return players.find(p => p.id === id); }
 
-// ——— attribution de gorgées / shots (menottes + fenêtre bouclier/miroir) ———
-function applyDrink(p, { g = 0, s = 0, fini = 0 }, sourceLabel, viaChain) {
+// ——— attribution de gorgées / shots ———
+// gère : mode sans shots (1 shot → 5 gorgées), « X boit pour tout le monde »
+// (redirection vers le chameau 🐫), menottes, fenêtre bouclier/miroir
+function applyDrink(p, { g = 0, s = 0, fini = 0 }, sourceLabel, viaChain, viaRedirect) {
+  if (game && game.noShots && s > 0) { g += s * 5; s = 0; }
+  if (!viaRedirect && game && game.phase === 'playing' && (g > 0 || s > 0 || fini > 0)) {
+    const camel = players.find(x => x.boitPourTous && x.id !== p.id);
+    if (camel) {
+      event({ kind: 'drink', icon: '🐫', playerId: camel.id, text: `${camel.name} boit à la place de ${p.name} !` });
+      return applyDrink(camel, { g, s, fini }, `${sourceLabel} (pour ${p.name})`, viaChain, true);
+    }
+  }
   p.gorgees += g; p.shots += s; p.finis += fini;
   p.totalGorgees = (p.totalGorgees || 0) + g;
   p.totalShots = (p.totalShots || 0) + s;
@@ -202,7 +214,7 @@ function applyDrink(p, { g = 0, s = 0, fini = 0 }, sourceLabel, viaChain) {
         const otherId = c.a === p.id ? c.b : c.b === p.id ? c.a : null;
         const partner = otherId !== null ? byId(otherId) : null;
         if (partner) {
-          applyDrink(partner, { g, s }, 'Menottes ⛓️', true);
+          applyDrink(partner, { g, s }, 'Menottes ⛓️', true, false);
           event({ kind: 'drink', icon: '⛓️', playerId: partner.id, text: `Menottes ! ${partner.name} boit autant que ${p.name}` });
         }
       }
@@ -252,9 +264,14 @@ function startGame() {
     extraTurn: null,   // id du joueur qui rejoue (carte REJOUE)
     vote: null,
     chainDepth: 0,
+    noShots: lobbySettings.noShots,
+    finishOrder: [], // ids dans l'ordre d'arrivée
   };
   // chaque joueur démarre avec 2 cartes en main
   for (const p of players) p.hand = [draw(), draw()];
+  if (game.noShots) {
+    after(1300, () => event({ kind: 'status', icon: '🚫', voice: true, text: 'Mode sans shots : chaque shot vaut 5 gorgées !' }));
+  }
   // DEV_DEAL=corbeau,rejoue : force ces cartes en main (tests uniquement)
   if (process.env.DEV_DEAL) {
     const ids = process.env.DEV_DEAL.split(',');
@@ -274,18 +291,26 @@ function nextTurn() {
   let p = null, isExtra = false;
   const extra = game.extraTurn ? byId(game.extraTurn) : null;
   game.extraTurn = null;
-  if (extra && extra.online && !extra.benched) {
+  if (extra && extra.online && !extra.benched && !extra.finished) {
     p = extra; isExtra = true; // turnIdx est déjà sur lui
   } else {
     game.turnIdx = (game.turnIdx + 1) % game.order.length;
     p = byId(game.order[game.turnIdx]);
   }
   if (!p) return nextTurn();
+  if (p.finished) return nextTurn(); // déjà à l'arrivée : plus de tours
 
   // expiration des statuts « 1 tour complet » liés à ce joueur
   // (pas pendant un tour bonus : REJOUE ne doit pas raccourcir ses effets)
-  if (!isExtra && game.corbeaux.some(c => c.expiresOnTurnOf === p.id)) {
-    game.corbeaux = game.corbeaux.filter(c => c.expiresOnTurnOf !== p.id);
+  if (!isExtra) {
+    // menottes et corbeaux durent un tour de table complet
+    for (const c of game.chains) c.turnsLeft--;
+    if (game.chains.some(c => c.turnsLeft <= 0)) {
+      game.chains = game.chains.filter(c => c.turnsLeft > 0);
+      event({ kind: 'info', icon: '⛓️', text: 'Des menottes se déverrouillent' });
+    }
+    for (const c of game.corbeaux) c.turnsLeft--;
+    game.corbeaux = game.corbeaux.filter(c => c.turnsLeft > 0);
   }
   if (!isExtra && game.motInterdit && game.motInterdit.by === p.id) {
     event({ kind: 'info', icon: '🤫', text: `Le mot interdit « ${game.motInterdit.word} » expire, personne ne s'est fait avoir` });
@@ -296,11 +321,6 @@ function nextTurn() {
   if (expRules.length) {
     game.rules = game.rules.filter(r => r.expiresOnTurnOf !== p.id);
     event({ kind: 'info', icon: '📜', text: `La règle de ${p.name} expire` });
-  }
-  const expChains = isExtra ? [] : game.chains.filter(c => c.expiresOnTurnOf === p.id);
-  if (expChains.length) {
-    game.chains = game.chains.filter(c => c.expiresOnTurnOf !== p.id);
-    event({ kind: 'info', icon: '⛓️', text: 'Des menottes se déverrouillent' });
   }
   if (p.boitPourTous) p.boitPourTous = false;
 
@@ -580,7 +600,7 @@ function movePlayer(p, to) {
 function arrive(p) {
   if (!game || game.phase !== 'playing') return;
   const N = game.board.cells.length;
-  if (p.pos >= N - 1) return finishGame(p);
+  if (p.pos >= N - 1) return playerFinishes(p);
   // bombe piégée posée par une carte ?
   const trapIdx = game.traps.findIndex(t => t.cell === p.pos);
   if (trapIdx !== -1) {
@@ -658,7 +678,13 @@ function resolveCell(p, cell) {
       bannerThenNext({ kind: 'status', icon: '❄️', playerId: p.id, text: `${p.name} est gelé·e pour 1 tour !` });
       break;
     case 'gel-suivant': {
-      const t = byId(game.order[(game.turnIdx + 1) % game.order.length]);
+      let idx = game.turnIdx, t = null;
+      for (let i = 0; i < game.order.length; i++) {
+        idx = (idx + 1) % game.order.length;
+        const cand = byId(game.order[idx]);
+        if (cand && !cand.finished) { t = cand; break; }
+      }
+      if (!t) { after(600, nextTurn); break; }
       t.frozen += 1;
       bannerThenNext({ kind: 'status', icon: '🧊', playerId: t.id, text: `${t.name} est gelé·e pour 1 tour !` });
       break;
@@ -821,7 +847,7 @@ function playCard(p, cardId, payload) {
       break;
     }
     case 'putsch': {
-      const opts = players.filter(x => x.id !== p.id);
+      const opts = players.filter(x => x.id !== p.id && !x.finished);
       if (!opts.length) return;
       discard();
       const t = opts[Math.floor(Math.random() * opts.length)];
@@ -844,7 +870,7 @@ function playCard(p, cardId, payload) {
       const b = byId(parseInt(payload && payload.b, 10));
       if (!a || !b || a.id === b.id) return;
       discard();
-      game.chains.push({ a: a.id, b: b.id, expiresOnTurnOf: p.id });
+      game.chains.push({ a: a.id, b: b.id, turnsLeft: game.order.length });
       cardEvent({ kind: 'status', icon: '⛓️', text: `Quelqu'un a menotté ${a.name} et ${b.name} pour 1 tour : quand l'un boit, l'autre boit !` });
       break;
     }
@@ -913,24 +939,47 @@ function playCard(p, cardId, payload) {
   broadcast();
 }
 
-// ——— Fin de partie ———
-function finishGame(winner) {
+// ——— Arrivée d'un joueur : la partie continue jusqu'à l'avant-dernier ———
+function playerFinishes(p) {
+  p.finished = true;
+  game.finishOrder.push(p.id);
+  const rank = game.finishOrder.length;
+  // ses statuts « jusqu'à mon prochain tour » n'expireront jamais : on purge
+  if (game.motInterdit && game.motInterdit.by === p.id) game.motInterdit = null;
+  if (game.freeze && game.freeze.by === p.id) game.freeze = null;
+  game.rules = game.rules.filter(r => r.expiresOnTurnOf !== p.id);
+  p.boitPourTous = false;
+  game.pending = null;
+
+  const remaining = players.filter(x => !x.finished);
+  if (remaining.length <= 1) return endGame(remaining[0] || null);
+
+  event({ kind: 'win', icon: '🏁', playerId: p.id, voice: true,
+    text: `${p.name} atteint l'ARRIVÉE (${rank === 1 ? '1er' : rank + 'e'}) ! La course continue pour les autres…` });
+  broadcast();
+  after(BANNER_MS, nextTurn);
+}
+
+// ——— Fin de partie : il ne reste qu'un joueur en course ———
+function endGame(last) {
   game.phase = 'over';
   game.pending = null;
   game.collect = null;
   game.vote = null;
-  const ranked = [...players].sort((a, b) => b.pos - a.pos);
-  const last = ranked[ranked.length - 1];
-  if (game.uniVerre > 0 && last) {
+  if (last && game.uniVerre > 0) {
     applyDrink(last, { g: game.uniVerre }, 'UNI.VERRE final');
   }
+  const order = [...game.finishOrder];
+  if (last) order.push(last.id);
   game.ranking = {
-    order: ranked.map(p => p.id),
-    winner: winner.id,
+    order,
+    winner: game.finishOrder[0] || (last && last.id),
     uniVerreLoser: last ? last.id : null,
     uniVerreAmount: game.uniVerre,
   };
-  event({ kind: 'win', icon: '🏆', playerId: winner.id, text: `${winner.name} atteint l'ARRIVÉE !${last && game.uniVerre > 0 ? ` ${last.name} (dernier·e) boit l'UNI.VERRE : ${game.uniVerre} gorgées !` : ''}` });
+  const winner = byId(game.ranking.winner);
+  event({ kind: 'win', icon: '🏆', playerId: winner ? winner.id : null,
+    text: `Course terminée !${last && game.uniVerre > 0 ? ` ${last.name} (dernier·e) boit l'UNI.VERRE : ${game.uniVerre} gorgées !` : ''}` });
   broadcast();
 }
 
@@ -992,6 +1041,13 @@ io.on('connection', (socket) => {
     if (isNaN(idx) || idx < 0 || idx >= SEATS) return;
     if (players.some(x => x.id !== p.id && x.seat === idx)) return; // place prise
     p.seat = idx;
+    broadcast();
+  });
+
+  socket.on('toggle-shots', () => {
+    const p = me();
+    if (!p || !isHost(p) || (game && game.phase === 'playing')) return;
+    lobbySettings.noShots = !lobbySettings.noShots;
     broadcast();
   });
 
@@ -1196,7 +1252,7 @@ io.on('connection', (socket) => {
   socket.on('send-corbeau', () => {
     const p = me();
     if (!p || !game || game.phase !== 'playing' || !p.corbeau) return;
-    game.corbeaux.push({ text: p.corbeau, expiresOnTurnOf: p.id });
+    game.corbeaux.push({ text: p.corbeau, turnsLeft: game.order.length });
     p.corbeau = null;
     event({ kind: 'status', icon: '💌', voice: true, text: `CORBEAU anonyme : « ${game.corbeaux[game.corbeaux.length - 1].text} »` });
     broadcast();

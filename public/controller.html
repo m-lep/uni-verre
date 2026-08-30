@@ -551,6 +551,10 @@
         return;
       }
       if (you.collect) { zone.innerHTML = ''; return; }
+      if (you.me.finished) {
+        zone.innerHTML = '<div id="waitBox"><div class="big">🏁</div>Tu es arrivé·e ! La course continue pour les autres…<br/>Tu peux encore <b>voter</b> et <b>jouer tes cartes</b> 😈</div>';
+        return;
+      }
       if (!pend) {
         const turnP = pById(you.turn);
         zone.innerHTML = '<div id="waitBox"><div class="big">🍹</div>Au tour de <b>' + (turnP ? esc(turnP.name) : '…') + '</b></div>';
@@ -622,7 +626,8 @@
         seatEls.push('<g class="seat ' + cls + '" onclick="pickSeat(' + i + ', ' + (p && !mine ? 'true' : 'false') + ')">' + inner + '</g>');
       }
       const seated = you.me.seat !== null && you.me.seat !== undefined;
-      zone.innerHTML = '<div id="seatWrap">' +
+      const mode = you.noShots ? '<div style="text-align:center;font-size:13px;color:#ff9d7a;font-weight:600">🚫🥃 Mode sans shots : chaque shot vaudra 5 gorgées</div>' : '';
+      zone.innerHTML = '<div id="seatWrap">' + mode +
         '<div id="seatTitle">' + (seated ? '✅ Tu es installé·e ! (tape ailleurs pour changer)' : '🪑 <b>Tape sur ta place</b> autour de la table, là où tu es assis·e') + '</div>' +
         '<svg id="seatSvg" viewBox="0 0 ' + W + ' ' + H + '">' +
         '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + (rx - 34) + '" ry="' + (ry - 26) + '" fill="#55371f" stroke="#e8c877" stroke-width="3"/>' +
@@ -641,7 +646,9 @@
       if (!you.isHost) { zone.innerHTML = ''; return; }
       if (you.phase === 'lobby') {
         const ready = you.allSeated;
-        zone.innerHTML = '<button class="ghost" onclick="socket.emit(\'new-board\')">🎲 NOUVEAU PLATEAU</button>' +
+        zone.innerHTML = '<button class="ghost" onclick="socket.emit(\'toggle-shots\')">' +
+          (you.noShots ? '🚫🥃 SANS SHOTS (1 shot = 5 gorgées)' : '🥃 SHOTS ACTIVÉS') + '</button>' +
+          '<button class="ghost" onclick="socket.emit(\'new-board\')">🎲 NOUVEAU PLATEAU</button>' +
           '<button onclick="socket.emit(\'start\')" ' + (ready ? '' : 'disabled') + '>▶ COMMENCER' + (ready ? '' : ' (tout le monde doit s\'asseoir)') + '</button>';
       } else if (you.phase === 'over') {
         zone.innerHTML = '<button onclick="socket.emit(\'replay\')">🔄 REJOUER (nouveau plateau)</button>';
