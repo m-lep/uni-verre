@@ -61,7 +61,7 @@ body {
 #turnbox .t1 { font-size: 11.5px; opacity: .7; }
 #turnbox .t2 { font-family: 'Bebas Neue', sans-serif; font-size: 21px; letter-spacing: 1px; }
 
-#playersPanel { display: flex; flex-direction: column; gap: 8px; }
+#playersPanel { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 36vh; flex-shrink: 0; }
 .pcard {
   display: flex; align-items: center; gap: 8px;
   background: rgba(255,255,255,.06);

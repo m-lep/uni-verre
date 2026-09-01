@@ -29,6 +29,7 @@ function lanIP() {
 
 app.get('/state', (_req, res) => {
   res.json({
+    version: 'v3.1',
     snapshot: snapshot(),
     awaitingAnim: game ? game.awaitingAnim || null : null,
     fullPending: game ? game.pending : null,
@@ -1070,7 +1071,8 @@ io.on('connection', (socket) => {
 
   socket.on('replay', () => {
     const p = me();
-    if (!p || !isHost(p) || !game || game.phase !== 'over') return;
+    // à la fin de partie, n'importe quel joueur peut relancer
+    if (!p || !game || game.phase !== 'over') return;
     clearTimers();
     lobbyBoard = freshBoard();
     game = null;

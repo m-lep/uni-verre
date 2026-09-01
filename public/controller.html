@@ -9,15 +9,16 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rubik:wght@400;600;800&display=swap" rel="stylesheet" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html, body { height: 100%; }
+    html { height: 100%; }
     body {
+      min-height: 100%;
       font-family: 'Rubik', system-ui, sans-serif;
       color: #f7e8c3;
-      background: linear-gradient(160deg, #4a2f1c, #241209);
+      background: linear-gradient(160deg, #4a2f1c, #241209) fixed;
       display: flex; flex-direction: column;
       padding: 14px; gap: 12px;
       user-select: none; -webkit-user-select: none;
-      overflow: hidden;
+      overflow-y: auto; overflow-x: hidden;
     }
     h1 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 3px; color: #e8c877; text-align: center; }
     .hidden { display: none !important; }
@@ -85,15 +86,18 @@
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
     .pickBtn {
-      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
       background: rgba(255,255,255,.1); color: #f7e8c3;
-      box-shadow: 0 4px 0 rgba(0,0,0,.4); font-size: 15px;
+      box-shadow: 0 4px 0 rgba(0,0,0,.4); font-size: 13px;
+      padding: 9px 6px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .pickBtn img { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; }
+    .pickBtn img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; }
     .pickBtn.sel { outline: 3px solid #e8c877; background: rgba(232, 200, 119, .25); }
 
     .distRow { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,.08); border-radius: 14px; padding: 8px 12px; }
-    .distRow img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; }
+    .distRow img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; }
+    .distRow { padding: 6px 10px; }
     .distRow .dn { flex: 1; font-weight: 600; }
     .distRow button { width: 44px; height: 44px; font-size: 24px; padding: 0; border-radius: 12px; }
     .distRow .dv { width: 28px; text-align: center; font-size: 21px; font-weight: 800; }
@@ -102,7 +106,10 @@
     #waitBox { text-align: center; opacity: .85; font-size: 17px; line-height: 1.5; }
     #waitBox .big { font-size: 40px; }
 
-    .panel { border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+    .panel {
+      border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px;
+      max-height: 44vh; overflow-y: auto; flex-shrink: 0;
+    }
     #motPanel { background: rgba(130, 90, 200, .25); border: 1px solid #b48aff; }
     #defPanel { background: rgba(255, 150, 60, .16); border: 2px solid #ff9d5c; animation: pulse 1s infinite; }
     #corbeauPanel { background: rgba(200, 120, 200, .16); border: 2px solid #d98ad9; }
@@ -547,7 +554,8 @@
       const pend = you.myPending;
       if (you.phase === 'lobby') { renderSeats(zone); return; }
       if (you.phase === 'over') {
-        zone.innerHTML = '<div id="waitBox"><div class="big">🏁</div>Partie terminée ! Regarde le podium sur l\'écran.</div>';
+        zone.innerHTML = '<div id="waitBox"><div class="big">🏁</div>Partie terminée ! Regarde le podium sur l\'écran.</div>' +
+          '<button onclick="socket.emit(\'replay\')">🔄 REJOUER (nouveau plateau)</button>';
         return;
       }
       if (you.collect) { zone.innerHTML = ''; return; }
@@ -650,8 +658,6 @@
           (you.noShots ? '🚫🥃 SANS SHOTS (1 shot = 5 gorgées)' : '🥃 SHOTS ACTIVÉS') + '</button>' +
           '<button class="ghost" onclick="socket.emit(\'new-board\')">🎲 NOUVEAU PLATEAU</button>' +
           '<button onclick="socket.emit(\'start\')" ' + (ready ? '' : 'disabled') + '>▶ COMMENCER' + (ready ? '' : ' (tout le monde doit s\'asseoir)') + '</button>';
-      } else if (you.phase === 'over') {
-        zone.innerHTML = '<button onclick="socket.emit(\'replay\')">🔄 REJOUER (nouveau plateau)</button>';
       } else zone.innerHTML = '';
     }
   </script>
