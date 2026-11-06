@@ -74,6 +74,38 @@
       display: flex; flex-direction: column; align-items: center; gap: 4px;
     }
     .cardBtn .ci { font-size: 26px; }
+    .cardBtn .cs { font-size: 9.5px; font-weight: 600; opacity: .8; line-height: 1.2; }
+    .cardBtn .ctag { font-size: 9px; font-weight: 800; background: rgba(0,0,0,.18); border-radius: 6px; padding: 1px 5px; }
+    .cardBtn.isnew { outline: 3px solid #fff3d6; }
+    #handHead { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; opacity: .75; margin-bottom: -4px; }
+    #helpBtn { width: 44px; height: 44px; padding: 0; font-size: 20px; border-radius: 12px; flex: none; }
+    #effects { display: flex; flex-direction: column; gap: 6px; }
+    #effects:empty { display: none; }
+    .fx { font-size: 13.5px; line-height: 1.35; padding: 7px 10px; border-radius: 10px; background: rgba(255,255,255,.08); border-left: 4px solid #e8c877; }
+    .fx.bad { border-left-color: #ff8a5c; }
+    .fx.cold { border-left-color: #4fc3f7; }
+    .preview { background: rgba(232,200,119,.14); border: 1px solid rgba(232,200,119,.5); border-radius: 12px; padding: 10px 12px; font-size: 14.5px; line-height: 1.4; text-align: center; }
+    .preview.warn { background: rgba(255,138,92,.15); border-color: #ff8a5c; }
+    .why { text-align: center; font-size: 14.5px; font-weight: 600; color: #ffbe9a; }
+    .tags { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+    .tags span { font-size: 12px; font-weight: 700; background: rgba(205,178,255,.2); border: 1px solid #cdb2ff; border-radius: 8px; padding: 2px 8px; }
+    .hint { text-align: center; font-size: 13px; opacity: .75; line-height: 1.4; }
+    #drinkFlash {
+      position: fixed; left: 12px; right: 12px; top: 12px; z-index: 25;
+      background: linear-gradient(160deg, #ff9d5c, #e0502c); color: #fff; border-radius: 16px;
+      padding: 14px 16px; font-size: 19px; font-weight: 800; text-align: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,.5); transition: opacity .3s, transform .3s;
+    }
+    #drinkFlash.off { opacity: 0; transform: translateY(-20px); pointer-events: none; }
+    #drinkFlash small { display: block; font-size: 13px; font-weight: 600; opacity: .9; }
+    #turnFlash { text-align: center; font-family: 'Bebas Neue', sans-serif; font-size: 34px; letter-spacing: 2px; color: #ffe9a8; }
+    .help h3 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 1.5px; font-size: 22px; color: #e8c877; margin-top: 6px; }
+    .help p { font-size: 14px; line-height: 1.45; }
+    .hrow { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.4; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.07); }
+    .hrow .hi { font-size: 22px; width: 30px; text-align: center; flex: none; }
+    .hrow b { display: block; font-size: 13px; letter-spacing: .3px; }
+    .cellPick { display: flex; flex-direction: column; gap: 1px; align-items: center; }
+    .cellPick small { font-size: 9px; font-weight: 600; opacity: .75; line-height: 1.1; white-space: normal; }
     .cardBtn.win { background: linear-gradient(160deg, #ffe9a8, #e8c877); box-shadow: 0 4px 0 #8a6a2f; animation: pulse .6s infinite; }
     .cardBtn.inactive { opacity: .45; }
 
@@ -148,8 +180,8 @@
     }
     #cardSheetTitle { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px; color: #cdb2ff; text-align: center; }
     #cardSheetText { text-align: center; font-size: 15px; line-height: 1.4; }
-    #cellGrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
-    #cellGrid button { padding: 10px 0; font-size: 15px; }
+    #cellGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    #cellGrid button { padding: 7px 3px; font-size: 15px; }
 
     #toast {
       position: fixed; left: 12px; right: 12px; bottom: 14px;
@@ -178,7 +210,10 @@
         <div id="meStats"></div>
         <div id="meTotal"></div>
       </div>
+      <button id="helpBtn" class="ghost" onclick="showHelp()" aria-label="Règles">📖</button>
     </div>
+    <div id="effects"></div>
+    <div id="handHead" class="hidden"><span>🃏 Tes cartes — tape pour voir / jouer</span></div>
     <div id="hand"></div>
     <div id="defPanel" class="panel hidden"></div>
     <div id="corbeauPanel" class="panel hidden"></div>
@@ -192,6 +227,7 @@
 
   <div id="cardSheet" class="hidden"></div>
   <div id="toast"></div>
+  <div id="drinkFlash" class="off"></div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
@@ -253,6 +289,14 @@
       if (ev.kind === 'drink' && you && ev.playerId === you.me.id && navigator.vibrate) navigator.vibrate([120, 60, 120]);
     });
 
+    socket.on('notice', n => toast((n.icon || '') + ' ' + n.text, 5000));
+    function toast(text, ms = 3200) {
+      $('toast').textContent = text;
+      $('toast').classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => $('toast').classList.remove('show'), ms);
+    }
+
     function esc(s) { return String(s).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c])); }
     function pById(id) { return you.players.find(p => p.id === id); }
     function av(p) {
@@ -265,8 +309,10 @@
     socket.on('you', (data) => {
       you = data;
       renderMe();
-      renderHand();
+      renderEffects();
+      renderAlerts();
       renderDefense();
+      renderHand();
       renderCorbeau();
       renderFreeze();
       renderMot();
@@ -288,62 +334,216 @@
       $('meTotal').textContent = 'Total soirée : ' + me.totalGorgees + ' gorgées · ' + me.totalShots + ' shots';
     }
 
-    // ——— Main de cartes ———
-    // tap court = jouer, appui long (~0,5 s) = voir ce que fait la carte
-    function renderHand() {
-      const cards = you.hand || [];
-      $('hand').innerHTML = cards.map((c, i) => {
-        const isWin = c.kind === 'window';
-        let usable = you.phase === 'playing' && !you.collect && !you.vote && (!isWin || you.shieldWindow);
-        if (c.id === 'rejoue') usable = usable && you.myPending && you.myPending.type === 'roll';
-        return '<button class="cardBtn ' + (isWin && you.shieldWindow ? 'win' : '') + (usable ? '' : ' inactive') + '" data-idx="' + i + '" data-usable="' + (usable ? 1 : 0) + '">' +
-          '<span class="ci">' + c.icon + '</span>' + esc(c.title) + '</button>';
-      }).join('');
-      for (const btn of document.querySelectorAll('#hand .cardBtn')) {
-        const idx = parseInt(btn.dataset.idx, 10);
-        const usable = btn.dataset.usable === '1';
-        let timer = null, longFired = false;
-        const startHold = () => { longFired = false; timer = setTimeout(() => { longFired = true; showCardInfo(idx); if (navigator.vibrate) navigator.vibrate(25); }, 480); };
-        const endHold = () => clearTimeout(timer);
-        btn.addEventListener('pointerdown', startHold);
-        btn.addEventListener('pointerup', endHold);
-        btn.addEventListener('pointerleave', endHold);
-        btn.addEventListener('contextmenu', e => e.preventDefault());
-        btn.addEventListener('click', () => {
-          if (longFired) { longFired = false; return; }
-          if (usable) openCard(idx); else showCardInfo(idx); // inactive : tap = info
-        });
+    // ——— Textes d'aide : ce que fait chaque case (selon son intensité) ———
+    function shotWord() { return you && you.noShots ? '5 gorgées' : '1 shot'; }
+    const CELL_HELP = {
+      depart: () => 'Case de départ.',
+      arrivee: () => 'Arrivée ! Tu sors de la course. Le dernier encore en course boit l\'UNI.VERRE.',
+      boit: c => 'Tu bois ' + c.n + ' gorgées.',
+      distribue: c => 'Tu répartis ' + c.n + ' gorgées entre les autres, sur ton téléphone.',
+      shot: () => 'Tu bois ' + shotWord() + '.',
+      'fini-verre': () => 'Tu finis ton verre.',
+      'fini-droite': () => 'Ton voisin de DROITE à table finit son verre.',
+      'fini-gauche': () => 'Ton voisin de GAUCHE à table finit son verre.',
+      'tous-boivent': c => 'Tout le monde boit ' + c.n + ' gorgées, toi compris.',
+      'uni-plus': c => 'Tu verses ' + c.n + ' doses dans l\'UNI.VERRE (le dernier le boira).',
+      'uni-gorgees': c => 'Tu bois ' + c.n + ' gorgées prises dans l\'UNI.VERRE. S\'il en contient moins de ' + c.n + ', tu y verses ' + c.n + ' doses à la place.',
+      saute: () => 'Ton pion saute en avant jusqu\'à la case indiquée, et tu appliques son effet.',
+      retourne: () => 'Ton pion recule jusqu\'à la case indiquée, et tu appliques son effet.',
+      gel: () => 'Tu passes ton prochain tour.',
+      'gel-suivant': () => 'Le prochain joueur en course passe son tour.',
+      roulette: c => 'Tourne 6 fois sur toi-même, puis bois ' + c.n + ' gorgées.',
+      'mot-interdit': () => 'Tu choisis un mot. Jusqu\'à ton prochain tour, celui qui le dit boit ' + shotWord() + ' : on le balance sur son téléphone, la table vote.',
+      meduse: () => 'Tout le monde baisse la tête, puis la relève au signal en regardant quelqu\'un. Chacun déclare qui il a regardé : deux regards croisés = ' + shotWord() + ' chacun.',
+      'bras-de-fer': () => 'Tu choisis un adversaire. La table vote pour le gagnant : le perdant boit ' + shotWord() + '. Table partagée = 2 gorgées chacun.',
+      freeze: c => 'Freeze armé jusqu\'à ton prochain tour. Quand tu veux, fige-toi et appuie ⚡ : tout le monde doit se figer, la table désigne le dernier, il boit ' + c.n + ' gorgées.',
+      imite: () => 'Imite quelqu\'un de la pièce. Les autres te notent de 0 à 5 ⭐ : tu bois 5 moins la note moyenne.',
+      'invente-regle': () => 'Tu inventes une règle, valable jusqu\'à ton prochain tour (affichée sur la TV).',
+      question: () => 'Réponds à voix haute, ou refuse et bois 3 gorgées.',
+      ficha: () => 'Montre-le à la table, ou refuse et bois 3 gorgées.',
+      'change-recipient': () => 'Verse ton verre dans autre chose (bol, tasse…) et continue avec.',
+      'echange-verre': () => 'Tu échanges ton verre avec le joueur de ton choix.',
+      valise: c => '« Dans ma valise il y a… » : chacun répète la liste et ajoute un objet. La table désigne le premier qui se trompe : il boit ' + c.n + ' gorgées.',
+      carte: () => 'Tu pioches une carte : elle arrive en secret sur ton téléphone.',
+      compliments: () => 'Fais un compliment sincère à chaque joueur. Si la majorité dit « pas sincère » : 3 gorgées.',
+      duel: () => 'Tu choisis un adversaire, chacun lance un dé : le plus petit boit la différence. Égalité = 2 gorgées chacun.',
+      'bois-pour-tous': () => 'Jusqu\'à ton prochain tour, tout ce que les autres devraient boire, c\'est toi qui le bois.',
+    };
+    function cellLabel(c) { return you && you.noShots ? c.label.replace(/1 SHOT/g, '5 GORGÉES') : c.label; }
+    function cellHelp(c) { return (CELL_HELP[c.type] || (() => ''))(c); }
+
+    let CARD_CATALOG = [];
+    fetch('/cards').then(r => r.json()).then(x => { CARD_CATALOG = x; }).catch(() => {});
+
+    // ——— Règles consultables à tout moment ———
+    window.showHelp = () => {
+      const board = (you && you.board) || [];
+      const seen = new Set(); const rows = [];
+      board.forEach(c => {
+        if (c.type === 'depart' || seen.has(c.type)) return;
+        seen.add(c.type);
+        rows.push('<div class="hrow"><span class="hi">' + c.icon + '</span><div><b>' + esc(cellLabel(c)) + '</b>' + esc(cellHelp(c)) + '</div></div>');
+      });
+      const cards = CARD_CATALOG.map(c => '<div class="hrow"><span class="hi">' + c.icon + '</span><div><b>' + esc(c.title) +
+        (c.anonymous ? ' 🕶' : '') + (c.kind === 'window' ? ' 🛡️' : '') + '</b>' + esc(cardText(c)) + '</div></div>').join('');
+      $('cardSheet').innerHTML = '<div id="cardSheetInner" class="help"><div id="cardSheetTitle">📖 RÈGLES</div>' +
+        '<h3>🎯 Le but</h3><p>Arriver avant les autres. La partie continue jusqu\'à ce qu\'il ne reste qu\'un joueur en course : <b>le dernier boit l\'UNI.VERRE</b> (tout ce qui a été versé dedans).</p>' +
+        '<h3>🎲 Ton tour</h3><p>Lance le dé sur ton téléphone. Ton pion avance et l\'effet de la case s\'applique. Quand il faut choisir, voter ou répondre, ça apparaît ici.</p>' +
+        (you && you.noShots ? '<p>🚫🥃 <b>Mode sans shots</b> : chaque shot vaut 5 gorgées.</p>' : '') +
+        '<h3>🃏 Les cartes</h3><p>2 cartes au départ, +1 à chaque case Pioche. Tu les joues quand tu veux, même hors de ton tour (sauf pendant un vote ou une décision de la table). ' +
+        '🕶 = <b>anonyme</b> : la TV ne dit pas qui l\'a jouée. 🛡️ = <b>défense</b> : se propose toute seule quand tu reçois à boire, et vaut pour la dernière chose que tu as reçue.</p>' +
+        cards +
+        '<h3>🟫 Les cases de ce plateau</h3>' + rows.join('') +
+        '<button class="ghost" onclick="closeSheet()">FERMER</button></div>';
+      $('cardSheet').classList.remove('hidden');
+    };
+
+    // ——— Effets en cours qui te concernent ———
+    function renderEffects() {
+      const me = you.me, fx = [];
+      if (you.phase !== 'playing') { $('effects').innerHTML = ''; return; }
+      if (me.frozen) fx.push(['cold', '❄️ Tu es gelé·e : tu passes ton prochain tour.']);
+      if (me.ancre) fx.push(['bad', '⚓ Ton prochain dé sera divisé par deux.']);
+      if (me.boitPourTous) fx.push(['bad', '🐫 Tu bois à la place de tout le monde jusqu\'à ton prochain tour.']);
+      for (const id of you.myChains || []) {
+        const o = pById(id);
+        fx.push(['bad', '⛓️ Menotté·e avec ' + esc(o ? o.name : '?') + ' : quand l\'un boit, l\'autre boit autant.']);
       }
+      const camel = you.players.find(p => p.boitPourTous && p.id !== me.id);
+      if (camel) fx.push(['', '🐫 ' + esc(camel.name) + ' boit à ta place jusqu\'à son prochain tour.']);
+      for (const r of you.rules || []) fx.push(['', '📜 Règle de ' + esc(r.by) + ' : « ' + esc(r.text) + ' »']);
+      $('effects').innerHTML = fx.map(([k, t]) => '<div class="fx ' + k + '">' + t + '</div>').join('');
     }
 
-    window.showCardInfo = (i) => {
-      const c = (you.hand || [])[i];
-      if (!c) return;
-      const sheet = $('cardSheet');
-      sheet.innerHTML = '<div id="cardSheetInner"><div id="cardSheetTitle">' + c.icon + ' ' + esc(c.title) + '</div>' +
-        '<div id="cardSheetText">' + esc(c.text) + '</div>' +
-        (c.kind === 'window' ? '<div id="cardSheetText" style="opacity:.7">Cette carte se propose automatiquement quand tu reçois à boire.</div>' : '') +
-        '<button class="ghost" onclick="closeSheet()">FERMER</button></div>';
-      sheet.classList.remove('hidden');
-    };
+    // ——— Alertes perso : « tu bois », « c'est ton tour » ———
+    let lastDrinkSeen = null, flashTimer = null, wasMyTurn = false;
+    function drinkWhat(ld) {
+      return [ld.g ? ld.g + ' gorgée' + (ld.g > 1 ? 's' : '') : '', ld.s ? ld.s + ' shot' + (ld.s > 1 ? 's' : '') : '', ld.fini ? 'ton verre en entier' : '']
+        .filter(Boolean).join(' + ');
+    }
+    function renderAlerts() {
+      const ld = you.myLastDrink;
+      if (ld && ld.ts !== lastDrinkSeen) {
+        const first = lastDrinkSeen === null && Date.now() - ld.ts > 8000; // pas d'alerte au rechargement
+        lastDrinkSeen = ld.ts;
+        if (!first) {
+          const f = $('drinkFlash');
+          f.innerHTML = '🍺 Tu bois ' + esc(drinkWhat(ld)) + ' !' + (ld.source ? '<small>' + esc(ld.source) + '</small>' : '');
+          f.classList.remove('off');
+          clearTimeout(flashTimer);
+          flashTimer = setTimeout(() => f.classList.add('off'), 4500);
+        }
+      }
+      const mine = !!(you.myPending && you.myPending.type === 'roll');
+      if (mine && !wasMyTurn && navigator.vibrate) navigator.vibrate([200, 80, 200]);
+      wasMyTurn = mine;
+    }
+
+    // ——— Main de cartes ———
+    // tap = fiche de la carte : ce qu'elle fait, ce qu'elle va faire MAINTENANT,
+    // et pourquoi elle n'est pas jouable si c'est le cas
+    let knownHand = null, handPhase = null, newCards = new Set();
+    function cardText(c) { return you && you.noShots ? c.text.replace(/1 shot/g, '5 gorgées') : c.text; }
+    function cardState(c) {
+      if (you.phase !== 'playing') return { usable: false, why: 'La partie n\'a pas commencé.' };
+      if (you.collect) return { usable: false, why: 'Attends que la table ait fini de décider.' };
+      if (you.vote) return { usable: false, why: 'Attends la fin du vote.' };
+      if (c.kind === 'window' && !you.shieldWindow) return { usable: false, why: 'Se joue quand tu reçois à boire : elle te sera proposée à ce moment-là.' };
+      if (c.id === 'rejoue' && !(you.myPending && you.myPending.type === 'roll')) return { usable: false, why: 'Se joue seulement à ton tour, avant de lancer le dé.' };
+      if ((c.id === 'turbo' || c.id === 'putsch') && you.me.finished) return { usable: false, why: 'Tu es déjà à l\'arrivée : ton pion ne bouge plus.' };
+      if (c.id === 'corbeau' && you.myCorbeau) return { usable: false, why: 'Envoie d\'abord ton corbeau en attente.' };
+      if (c.id === 'putsch' && !you.players.some(p => p.id !== you.me.id && !p.finished)) return { usable: false, why: 'Personne d\'autre en course.' };
+      return { usable: true };
+    }
+    function cardPreview(c) {
+      const N = you.board.length, me = you.me, P = you.players;
+      const cell = i => 'case ' + (i + 1) + ' « ' + cellLabel(you.board[i]) + ' »';
+      switch (c.id) {
+        case 'tous2': return { t: 'Les ' + P.length + ' joueurs boivent 2 gorgées, <b>toi compris</b>.' };
+        case 'uni4': return { t: 'L\'UNI.VERRE passe de ' + you.uniVerre + ' à <b>' + (you.uniVerre + 4) + '</b> doses.' };
+        case 'turbo': {
+          const to = Math.min(N - 2, me.pos + 3);
+          return { t: 'Ton pion : case ' + (me.pos + 1) + ' → <b>' + cell(to) + '</b>.<br/>L\'effet de cette case ne s\'applique pas.' + (to < me.pos + 3 ? '<br/>(Bloqué juste avant l\'arrivée.)' : '') };
+        }
+        case 'premier3': {
+          const t = [...P].sort((a, b) => b.pos - a.pos)[0];
+          return { t: '<b>' + esc(t.name) + '</b> (case ' + (t.pos + 1) + (t.finished ? ', arrivé·e' : '') + ') boira 3 gorgées.', warn: t.id === me.id && 'C\'est toi qui es en tête !' };
+        }
+        case 'dernier3': {
+          const t = [...P].sort((a, b) => a.pos - b.pos)[0];
+          return { t: '<b>' + esc(t.name) + '</b> (case ' + (t.pos + 1) + ') boira 3 gorgées.', warn: t.id === me.id && 'C\'est toi le dernier !' };
+        }
+        case 'putsch': {
+          const o = P.filter(p => p.id !== me.id && !p.finished);
+          return { t: 'Tu es case ' + (me.pos + 1) + '. Tu échanges ta place avec un joueur tiré au sort parmi : ' + o.map(p => esc(p.name) + ' (case ' + (p.pos + 1) + ')').join(', ') + '.<br/>Pas d\'effet de case.' };
+        }
+        case 'bouclier': case 'miroir': {
+          const ld = you.myLastDrink;
+          if (!ld) return null;
+          return { t: (c.id === 'bouclier' ? 'Annule' : 'Renvoie') + ' : <b>' + esc(drinkWhat(ld)) + '</b>' + (ld.source ? ' (' + esc(ld.source) + ')' : '') + '.<br/>Ça ne vaut que pour la dernière chose que tu as reçue.' };
+        }
+        case 'bombe': return { t: 'Le 💣 sera visible sur la TV, mais personne ne saura que c\'est toi. Elle explose sur le premier qui s\'y arrête : ' + shotWord() + '.' };
+        case 'menottes': return { t: 'Valable 1 tour de table. Tu peux te menotter toi-même.' };
+        case 'ancre': return { t: 'Le joueur verra ⚓ à côté de son nom jusqu\'à son prochain lancer.' };
+        case 'vol': return { t: 'La TV dit à qui une carte a été volée, pas par qui. Tu découvres la carte volée en privé.' };
+        case 'corbeau': return { t: 'Personne ne saura que c\'est toi. Le message reste affiché 1 tour de table.' };
+        case 'rejoue': return { t: 'Après ce tour, tu rejoues tout de suite un tour complet.' };
+      }
+      return null;
+    }
+
+    function renderHand() {
+      const cards = you.hand || [];
+      const ids = cards.map(c => c.id);
+      if (knownHand && you.phase === 'playing' && handPhase === 'playing') {
+        const pool = [...knownHand];
+        for (const id of ids) { const k = pool.indexOf(id); if (k >= 0) pool.splice(k, 1); else newCards.add(id); }
+      }
+      knownHand = ids; handPhase = you.phase;
+      for (const id of [...newCards]) if (!ids.includes(id)) newCards.delete(id);
+      $('handHead').classList.toggle('hidden', !cards.length);
+      $('hand').innerHTML = cards.map((c, i) => {
+        const st = cardState(c);
+        const glow = c.kind === 'window' && st.usable && !$('defPanel').classList.contains('hidden');
+        const tag = c.kind === 'window' ? '<span class="ctag">🛡️ défense</span>' : c.anonymous ? '<span class="ctag">🕶 anonyme</span>' : '';
+        return '<button class="cardBtn ' + (glow ? 'win' : '') + (st.usable ? '' : ' inactive') + (newCards.has(c.id) ? ' isnew' : '') + '" onclick="openCard(' + i + ')">' +
+          '<span class="ci">' + c.icon + '</span>' + esc(c.title) + tag + '</button>';
+      }).join('');
+    }
+
+    window.showCardInfo = (i) => window.openCard(i);
 
     window.openCard = (i) => {
       const c = (you.hand || [])[i];
       if (!c) return;
+      newCards.delete(c.id);
       const sheet = $('cardSheet');
+      const st = cardState(c);
+      const pv = cardPreview(c);
+      const tags = '<div class="tags">' + (c.anonymous ? '<span>🕶 Anonyme</span>' : '') + (c.kind === 'window' ? '<span>🛡️ Défense</span>' : '') + '</div>';
+      const head = '<div id="cardSheetTitle">' + c.icon + ' ' + esc(c.title) + '</div>' + tags +
+        '<div id="cardSheetText">' + esc(cardText(c)) + '</div>' +
+        (pv ? '<div class="preview">' + pv.t + '</div>' : '') +
+        (pv && pv.warn ? '<div class="preview warn">⚠️ ' + pv.warn + '</div>' : '');
       let body = '';
-      const close = '<button class="ghost" onclick="closeSheet()">ANNULER</button>';
-      if (!c.needs) {
+      const close = '<button class="ghost" onclick="closeSheet()">' + (st.usable ? 'ANNULER' : 'FERMER') + '</button>';
+      if (!st.usable) {
+        body = '<div class="why">⏳ ' + st.why + '</div>' + close;
+      } else if (!c.needs) {
         body = '<button onclick="playCard(\'' + c.id + '\', {})">JOUER ' + c.icon + '</button>' + close;
       } else if (c.needs === 'player') {
-        const opts = you.players.filter(p => p.id !== you.me.id);
-        body = '<div class="grid">' + opts.map(p =>
-          '<button class="pickBtn" onclick="playCard(\'' + c.id + '\', {target:' + p.id + '})"><img src="' + av(p) + '"/>' + esc(p.name) + '</button>').join('') + '</div>' + close;
+        let opts = you.players.filter(p => p.id !== you.me.id);
+        if (c.id === 'ancre') opts = opts.filter(p => !p.finished && !p.ancre);
+        const lbl = { ancre: 'Sur qui jeter l\'ancre ?', vol: 'À qui voler une carte ?', miroir: 'Sur qui renvoyer ?' }[c.id] || 'Choisis un joueur';
+        body = '<div class="vq">' + lbl + '</div><div class="grid">' + opts.map(p =>
+          '<button class="pickBtn" onclick="playCard(\'' + c.id + '\', {target:' + p.id + '})"><img src="' + av(p) + '"/>' + esc(p.name) +
+          (c.id === 'vol' ? ' · 🃏' + p.handCount : '') + '</button>').join('') + '</div>' +
+          (opts.length ? '' : '<div class="why">Personne à viser pour l\'instant.</div>') + close;
       } else if (c.needs === 'pair') {
         window._pair = [];
         const opts = you.players;
         body = '<div class="vq">Choisis DEUX joueurs à menotter</div><div class="grid" id="pairGrid">' + opts.map(p =>
-          '<button class="pickBtn" data-id="' + p.id + '" onclick="togglePair(this)"><img src="' + av(p) + '"/>' + esc(p.name) + '</button>').join('') + '</div>' +
+          '<button class="pickBtn" data-id="' + p.id + '" onclick="togglePair(this)"><img src="' + av(p) + '"/>' + esc(p.name) + (p.id === you.me.id ? ' (toi)' : '') + '</button>').join('') + '</div>' +
           '<button id="pairGo" disabled onclick="playCard(\'' + c.id + '\', {a:window._pair[0], b:window._pair[1]})">MENOTTER ⛓️</button>' + close;
       } else if (c.needs === 'cell') {
         const N = you.board.length;
@@ -351,8 +551,8 @@
         const trapped = new Set(you.traps || []);
         const cells = [];
         for (let k = 1; k <= N - 2; k++) if (!occupied.has(k) && !trapped.has(k)) cells.push(k);
-        body = '<div class="vq">Choisis la case à piéger (vide)</div><div id="cellGrid">' + cells.map(k =>
-          '<button class="ghost" onclick="playCard(\'' + c.id + '\', {cell:' + k + '})">' + (k + 1) + '</button>').join('') + '</div>' + close;
+        body = '<div class="vq">Choisis la case à piéger (numéros du plateau TV, cases vides seulement)</div><div id="cellGrid">' + cells.map(k =>
+          '<button class="ghost cellPick" onclick="playCard(\'' + c.id + '\', {cell:' + k + '})">' + (k + 1) + '<small>' + esc(you.board[k].icon + ' ' + cellLabel(you.board[k])) + '</small></button>').join('') + '</div>' + close;
       } else if (c.needs === 'message') {
         body = '<div class="vq">Écris ton message anonyme. Tu l\'enverras à l\'écran quand tu voudras.</div>' +
           '<input type="text" id="corbeauIn" maxlength="90" autocomplete="off" placeholder="Ton message…"/>' +
@@ -360,7 +560,7 @@
       } else if (c.needs === 'alloc') {
         window._dist = {}; window._distMax = 5;
         const opts = you.players.filter(p => p.id !== you.me.id);
-        body = '<div id="distLeft">Reste : <b id="leftN">5</b></div>' +
+        body = '<div id="distLeft">Reste à donner : <b id="leftN">5</b></div>' +
           opts.map(p =>
             '<div class="distRow"><img src="' + av(p) + '"/><div class="dn">' + esc(p.name) + '</div>' +
             '<button class="ghost" onclick="distAdj(' + p.id + ', -1)">−</button>' +
@@ -368,9 +568,9 @@
             '<button onclick="distAdj(' + p.id + ', 1)">+</button></div>').join('') +
           '<button id="distGo" disabled onclick="playCard(\'' + c.id + '\', {alloc: window._dist})">DISTRIBUER 🫗</button>' + close;
       }
-      sheet.innerHTML = '<div id="cardSheetInner"><div id="cardSheetTitle">' + c.icon + ' ' + esc(c.title) + '</div>' +
-        '<div id="cardSheetText">' + esc(c.text) + '</div>' + body + '</div>';
+      sheet.innerHTML = '<div id="cardSheetInner">' + head + body + '</div>';
       sheet.classList.remove('hidden');
+      renderHand();
     };
     window.closeSheet = () => $('cardSheet').classList.add('hidden');
     window.sendCorbeauCard = (id) => {
@@ -414,22 +614,22 @@
         panel.classList.add('hidden'); return;
       }
       panel.classList.remove('hidden');
-      const what = [ld.g ? ld.g + ' gorgée' + (ld.g > 1 ? 's' : '') : '', ld.s ? ld.s + ' shot' + (ld.s > 1 ? 's' : '') : '']
-        .filter(Boolean).join(' + ');
-      panel.innerHTML = '<div class="vq">🍺 Tu viens de recevoir <b>' + what + '</b>' +
+      const what = drinkWhat(ld);
+      panel.innerHTML = '<div class="vq">🍺 Tu viens de recevoir <b>' + esc(what) + '</b>' +
         (ld.source ? ' <span style="opacity:.7">(' + esc(ld.source) + ')</span>' : '') + ' !</div>' +
         '<div class="vbtns">' +
         (hasShield ? '<button onclick="defShield(' + ld.ts + ')">🛡️ J\'ANNULE</button>' : '') +
         (hasMirror ? '<button onclick="defMirror()">🪞 JE RENVOIE</button>' : '') +
         '</div>' +
-        '<button class="ghost" onclick="defDrink(' + ld.ts + ')">Je bois 💪</button>';
+        '<button class="ghost" onclick="defDrink(' + ld.ts + ')">Je bois 💪 (je garde ma carte)</button>' +
+        '<div class="hint">' + (hasShield ? '🛡️ Bouclier : tu ne bois rien. ' : '') + (hasMirror ? '🪞 Miroir : un autre boit à ta place. ' : '') + 'Tu peux encore changer d\'avis tant que tu ne reçois rien d\'autre.</div>';
     }
     window.defShield = (ts) => { defDismissed = 0; socket.emit('use-card', { id: 'bouclier', payload: {} }); };
     window.defDrink = (ts) => { defDismissed = ts; renderDefense(); };
     window.defMirror = () => {
       const panel = $('defPanel');
       const opts = you.players.filter(p => p.id !== you.me.id);
-      panel.innerHTML = '<div class="vq">🪞 Sur qui renvoies-tu tout ça ?</div>' +
+      panel.innerHTML = '<div class="vq">🪞 Sur qui renvoies-tu ' + esc(drinkWhat(you.myLastDrink || {})) + ' ?</div>' +
         '<div class="grid3">' + opts.map(p =>
           '<button class="pickBtn" onclick="socket.emit(\'use-card\', {id:\'miroir\', payload:{target:' + p.id + '}})"><img src="' + av(p) + '"/>' + esc(p.name) + '</button>'
         ).join('') + '</div>' +
@@ -451,7 +651,7 @@
       const panel = $('freezePanel');
       if (!you.freezeMine || you.phase !== 'playing') { panel.classList.add('hidden'); return; }
       panel.classList.remove('hidden');
-      panel.innerHTML = '<div class="vq">🥶 FREEZE armé — arrête-toi de bouger quand tu veux, puis appuie :</div>' +
+      panel.innerHTML = '<div class="vq">🥶 FREEZE armé jusqu\'à ton prochain tour.<br/>Quand tu veux : <b>fige-toi en silence</b>, attends que les autres le remarquent et se figent, puis appuie. La table désignera le dernier à s\'être figé (' + you.freeze.n + ' gorgées).</div>' +
         '<button class="danger" onclick="socket.emit(\'freeze-now\')">⚡ J\'AI FREEZÉ !</button>';
     }
 
@@ -462,7 +662,7 @@
       if (!mi || you.phase !== 'playing' || you.collect) { panel.classList.add('hidden'); return; }
       panel.classList.remove('hidden');
       const opts = you.players.filter(p => p.id !== you.me.id);
-      panel.innerHTML = '<div class="vq">🤫 Mot interdit : « <b>' + esc(mi.word) + '</b> »<br/>Quelqu\'un l\'a dit ? Balance :</div>' +
+      panel.innerHTML = '<div class="vq">🤫 Mot interdit : « <b>' + esc(mi.word) + '</b> »<br/>Quelqu\'un l\'a dit ? Balance-le : la table votera, coupable = ' + shotWord() + '.</div>' +
         '<div class="grid3">' + opts.map(p =>
           '<button class="pickBtn" onclick="socket.emit(\'mot-report\', ' + p.id + ')"><img src="' + av(p) + '"/>💥 ' + esc(p.name) + '</button>'
         ).join('') + '</div>';
@@ -483,6 +683,16 @@
       }
       let body = '';
       const meta = c.meta || {};
+      const EXPLAIN = {
+        meduse: 'Déclare honnêtement qui tu regardais en levant les yeux. Si cette personne t\'a désigné·e aussi : ' + shotWord() + ' chacun.',
+        accusation: 'Majorité de OUI = ' + shotWord() + ' pour l\'accusé·e. Égalité = acquitté·e.',
+        compliments: 'OUI = sincère. Si les NON l\'emportent, il/elle boit 3 gorgées.',
+        bdf: 'Le perdant boit ' + shotWord() + '. Si la table est partagée : 2 gorgées chacun.',
+        freeze: 'Le plus désigné boit. Ex æquo : ils boivent tous.',
+        valise: 'Le plus désigné boit. Ex æquo : ils boivent tous.',
+        imite: '5⭐ = parfait, il/elle ne boit rien. 0⭐ = 5 gorgées. Il/elle boit 5 moins la moyenne.',
+        pret: 'Quand tout le monde est prêt, la TV lance le compte à rebours : baissez la tête, relevez-la au signal en regardant quelqu\'un.',
+      };
       switch (c.purpose) {
         case 'meduse': {
           const opts = you.players.filter(p => p.id !== you.me.id);
@@ -506,19 +716,20 @@
         case 'freeze': case 'valise': {
           const opts = you.players;
           body = '<div class="grid3">' + opts.map(p =>
-            '<button class="pickBtn" onclick="answer(' + p.id + ')"><img src="' + av(p) + '"/>' + esc(p.name) + '</button>').join('') + '</div>' +
+            '<button class="pickBtn" onclick="answer(' + p.id + ')"><img src="' + av(p) + '"/>' + esc(p.name) + (p.id === you.me.id ? ' (moi)' : '') + '</button>').join('') + '</div>' +
             '<button class="ghost" onclick="answer(null)">Personne 😇</button>';
           break;
         }
         case 'imite':
           body = '<div class="stars">' + [0, 1, 2, 3, 4, 5].map(n =>
-            '<button class="ghost" onclick="answer(' + n + ')">' + n + '⭐</button>').join('') + '</div>';
+            '<button class="ghost" onclick="answer(' + n + ')">' + n + '⭐<br/><small style="font-size:10px;opacity:.75">' + (5 - n) + ' 🍺</small></button>').join('') + '</div>';
           break;
         case 'pret':
           body = '<button style="font-size:26px;padding:26px" onclick="answer(\'ok\')">✅ JE SUIS PRÊT·E</button>';
           break;
       }
-      panel.innerHTML = '<div class="vq">🗳️ ' + esc(c.prompt) + '</div>' + body;
+      panel.innerHTML = '<div class="vq">🗳️ ' + esc(c.prompt) + '</div>' +
+        (EXPLAIN[c.purpose] ? '<div class="hint">' + EXPLAIN[c.purpose] + '</div>' : '') + body;
     }
     window.answer = (v) => socket.emit('collect-answer', v);
 
@@ -565,16 +776,24 @@
       }
       if (!pend) {
         const turnP = pById(you.turn);
-        zone.innerHTML = '<div id="waitBox"><div class="big">🍹</div>Au tour de <b>' + (turnP ? esc(turnP.name) : '…') + '</b></div>';
+        const here = you.board[you.me.pos];
+        zone.innerHTML = '<div id="waitBox"><div class="big">🍹</div>Au tour de <b>' + (turnP ? esc(turnP.name) : '…') + '</b>' +
+          '<div class="hint" style="margin-top:8px">Ton pion : case ' + (you.me.pos + 1) + (here ? ' — ' + esc(cellLabel(here)) : '') + '</div></div>';
         return;
       }
       switch (pend.type) {
         case 'roll':
-          zone.innerHTML = '<button id="rollBtn" onclick="socket.emit(\'roll\')">🎲 LANCE LE DÉ</button>';
+          zone.innerHTML = '<div id="turnFlash">🔔 C\'EST TON TOUR !</div>' +
+            (you.me.ancre ? '<div class="preview warn">⚓ Ancre : ce lancer sera divisé par deux.</div>' : '') +
+            '<button id="rollBtn" onclick="socket.emit(\'roll\')">🎲 LANCE LE DÉ</button>' +
+            ((you.hand || []).some(c => c.id === 'rejoue') ? '<div class="hint">🔁 Tu as REJOUE : c\'est maintenant ou jamais pour ce tour.</div>' : '');
           break;
         case 'ok':
           zone.innerHTML = '<div id="actionLabel">' + esc(pend.label || 'À toi de jouer !') + '</div>' +
-            '<button onclick="socket.emit(\'ok\')">C\'EST FAIT ✔</button>';
+            (pend.purpose === 'refusable'
+              ? '<div class="vbtns" style="display:flex;gap:10px"><button style="flex:1" onclick="socket.emit(\'ok\', \'done\')">C\'EST FAIT ✔</button>' +
+                '<button class="danger" style="flex:1" onclick="socket.emit(\'ok\', \'refuse\')">JE BOIS 3 🍺</button></div>'
+              : '<button onclick="socket.emit(\'ok\')">C\'EST FAIT ✔</button>');
           break;
         case 'text':
           zone.innerHTML = '<div id="actionLabel">' + esc(pend.label) + '</div>' +
@@ -593,7 +812,7 @@
         case 'distribute': {
           const opts = you.players.filter(p => p.id !== you.me.id);
           window._dist = {}; window._distMax = pend.n;
-          zone.innerHTML = '<div id="actionLabel">🫗 Distribue ' + pend.n + ' gorgées</div>' +
+          zone.innerHTML = '<div id="actionLabel">🫗 Distribue ' + pend.n + ' gorgées aux autres</div><div class="hint">Tape + à côté des joueurs, puis envoie quand il ne reste plus rien.</div>' +
             '<div id="distLeft">Reste : <b id="leftN">' + pend.n + '</b></div>' +
             opts.map(p =>
               '<div class="distRow"><img src="' + av(p) + '"/><div class="dn">' + esc(p.name) + '</div>' +

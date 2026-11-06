@@ -27,6 +27,11 @@ function lanIP() {
   return 'localhost';
 }
 
+// catalogue des cartes (pour l'aide des téléphones)
+app.get('/cards', (_req, res) => {
+  res.json(CARDS.map(c => ({ id: c.id, title: c.title, text: c.text, icon: c.icon, kind: c.kind, anonymous: !!c.anonymous, count: c.count || 1 })));
+});
+
 app.get('/state', (_req, res) => {
   res.json({
     version: 'v3.1',
@@ -101,7 +106,7 @@ function publicPlayer(p) {
     pos: p.pos || 0, gorgees: p.gorgees || 0, shots: p.shots || 0, finis: p.finis || 0,
     frozen: p.frozen || 0, boitPourTous: !!p.boitPourTous, benched: !!p.benched,
     ancre: !!p.ancre, finished: !!p.finished,
-    handCount: (p.hand || []).length,
+    handCount: p.shownHand !== undefined ? p.shownHand : (p.hand || []).length,
     totalGorgees: p.totalGorgees || 0, totalShots: p.totalShots || 0,
   };
 }
@@ -168,7 +173,8 @@ function personal(p) {
   return {
     ...snap,
     me: publicPlayer(p),
-    hand: (p.hand || []).map(x => ({ id: x.id, title: x.title, text: x.text, icon: x.icon, kind: x.kind, needs: x.needs || null })),
+    hand: (p.hand || []).map(x => ({ id: x.id, title: x.title, text: x.text, icon: x.icon, kind: x.kind, needs: x.needs || null, anonymous: !!x.anonymous })),
+    myChains: game ? game.chains.filter(c => c.a === p.id || c.b === p.id).map(c => (c.a === p.id ? c.b : c.a)) : [],
     myTurn: snap.turn === p.id,
     myPending: game && game.pending && game.pending.playerId === p.id ? publicPending() : null,
     myCollect: c && c.playerIds.includes(p.id) && !(p.id in c.answers)
@@ -178,11 +184,31 @@ function personal(p) {
     myCorbeau: p.corbeau || null,
     shieldWindow: !!(p.lastDrink && !p.lastDrink.used),
     myLastDrink: p.lastDrink && !p.lastDrink.used
-      ? { g: p.lastDrink.g, s: p.lastDrink.s, source: p.lastDrink.source, ts: p.lastDrink.ts } : null,
+      ? { g: p.lastDrink.g, s: p.lastDrink.s, fini: p.lastDrink.fini || 0, source: p.lastDrink.source, ts: p.lastDrink.ts } : null,
     myVote: game && game.vote ? (game.vote.votes[p.id] || null) : null,
     isVoter: !!(game && game.vote && game.vote.voters.includes(p.id)),
     allSeated: players.length >= 2 && players.every(x => x.seat !== null && x.seat !== undefined),
   };
+}
+
+// libellé « 1 shot » adapté au mode sans shots
+function shotTxt(n = 1) {
+  if (game && game.noShots) return `${n * 5} gorgées`;
+  return `${n} shot${n > 1 ? 's' : ''}`;
+}
+
+// message privé à un seul téléphone (carte piochée, volée, refusée…)
+function notice(p, text, icon = 'ℹ️') {
+  if (p && p.socketId) io.to(p.socketId).emit('notice', { icon, text });
+}
+
+// nombre de joueurs encore en course (pour « 1 tour de table complet »)
+function activeCount() {
+  return Math.max(1, players.filter(x => !x.finished).length);
+}
+
+function syncShownHands() {
+  for (const p of players) p.shownHand = (p.hand || []).length;
 }
 
 function event(ev) {
@@ -207,8 +233,10 @@ function applyDrink(p, { g = 0, s = 0, fini = 0 }, sourceLabel, viaChain, viaRed
   p.gorgees += g; p.shots += s; p.finis += fini;
   p.totalGorgees = (p.totalGorgees || 0) + g;
   p.totalShots = (p.totalShots || 0) + s;
+  if (g > 0 || s > 0 || fini > 0) {
+    p.lastDrink = { g, s, fini, ts: Date.now(), used: false, source: sourceLabel };
+  }
   if (g > 0 || s > 0) {
-    p.lastDrink = { g, s, ts: Date.now(), used: false, source: sourceLabel };
     // menottes : le partenaire boit autant
     if (!viaChain && game && game.chains) {
       for (const c of game.chains) {
@@ -281,6 +309,7 @@ function startGame() {
       if (def) p.hand.push(def);
     }
   }
+  syncShownHands();
   broadcast();
   after(1200, nextTurn);
 }
@@ -324,6 +353,7 @@ function nextTurn() {
     event({ kind: 'info', icon: '📜', text: `La règle de ${p.name} expire` });
   }
   if (p.boitPourTous) p.boitPourTous = false;
+  syncShownHands();
 
   if (p.frozen > 0) {
     p.frozen--;
@@ -472,7 +502,7 @@ function resolveCollect() {
       } else {
         for (const [a, b] of pairs) { if (a) applyDrink(a, { s: 1 }, 'Méduse'); if (b) applyDrink(b, { s: 1 }, 'Méduse'); }
         const txt = pairs.map(([a, b]) => `${a ? a.name : '?'} 👀 ${b ? b.name : '?'}`).join(', ');
-        bannerThenNext({ kind: 'drink', icon: '🪼', text: `MÉDUSE : ${txt} → 1 shot chacun !` });
+        bannerThenNext({ kind: 'drink', icon: '🪼', text: `MÉDUSE : ${txt} → ${shotTxt()} chacun !` });
       }
       break;
     }
@@ -494,7 +524,7 @@ function resolveCollect() {
       const accused = byId(c.meta.accusedId);
       if (accused && oui > non) {
         applyDrink(accused, { s: 1 }, 'Mot interdit');
-        event({ kind: 'drink', icon: '💥', playerId: accused.id, text: `Coupable (${oui} oui / ${non} non) ! ${accused.name} a dit « ${c.meta.word} » : 1 shot !` });
+        event({ kind: 'drink', icon: '💥', playerId: accused.id, text: `Coupable (${oui} oui / ${non} non) ! ${accused.name} a dit « ${c.meta.word} » : ${shotTxt()} !` });
         if (game.motInterdit && game.motInterdit.word === c.meta.word) game.motInterdit = null;
       } else {
         event({ kind: 'info', icon: '⚖️', text: `Acquitté·e (${oui} oui / ${non} non) — le mot interdit reste en jeu` });
@@ -514,7 +544,7 @@ function resolveCollect() {
         const winner = byId(win[0]);
         const loser = win[0] === aId ? b : a;
         if (loser) applyDrink(loser, { s: 1 }, 'Bras de fer');
-        bannerThenNext({ kind: 'drink', icon: '💪', playerId: loser ? loser.id : null, text: `${winner ? winner.name : '?'} gagne le bras de fer, ${loser ? loser.name : '?'} boit 1 shot !` });
+        bannerThenNext({ kind: 'drink', icon: '💪', playerId: loser ? loser.id : null, text: `${winner ? winner.name : '?'} gagne le bras de fer, ${loser ? loser.name : '?'} boit ${shotTxt()} !` });
       }
       break;
     }
@@ -608,7 +638,7 @@ function arrive(p) {
     game.traps.splice(trapIdx, 1);
     applyDrink(p, { s: 1 }, 'Bombe piégée');
     io.to('screens').emit('trap-boom', { playerId: p.id, cell: p.pos });
-    event({ kind: 'drink', icon: '💥', playerId: p.id, text: `BOOM ! ${p.name} marche sur une bombe piégée : 1 shot !` });
+    event({ kind: 'drink', icon: '💥', playerId: p.id, text: `BOOM ! ${p.name} marche sur une bombe piégée : ${shotTxt()} !` });
     broadcast();
     after(2600, () => resolveCell(p, game.board.cells[p.pos]));
     return;
@@ -632,7 +662,7 @@ function resolveCell(p, cell) {
       break;
     case 'shot':
       applyDrink(p, { s: 1 }, cell.label);
-      bannerThenNext({ kind: 'drink', icon: '🥃', playerId: p.id, text: `${p.name} boit 1 shot !` });
+      bannerThenNext({ kind: 'drink', icon: '🥃', playerId: p.id, text: `${p.name} boit ${shotTxt()} !` });
       break;
     case 'fini-verre':
       applyDrink(p, { fini: 1 }, cell.label);
@@ -640,10 +670,12 @@ function resolveCell(p, cell) {
       break;
     case 'fini-droite': case 'fini-gauche': {
       const idx = game.order.indexOf(p.id);
-      const dir = cell.type === 'fini-droite' ? 1 : -1;
+      // places numérotées dans le sens horaire vu du dessus : pour quelqu'un
+      // assis face à la table, le siège suivant est à sa GAUCHE
+      const dir = cell.type === 'fini-droite' ? -1 : 1;
       const t = byId(game.order[(idx + dir + game.order.length) % game.order.length]);
       applyDrink(t, { fini: 1 }, cell.label);
-      bannerThenNext({ kind: 'drink', icon: cell.icon, playerId: t.id, text: `${t.name} (à ${dir > 0 ? 'droite' : 'gauche'} de ${p.name}) finit son verre !` });
+      bannerThenNext({ kind: 'drink', icon: cell.icon, playerId: t.id, text: `${t.name} (à ${cell.type === 'fini-droite' ? 'droite' : 'gauche'} de ${p.name}) finit son verre !` });
       break;
     }
     case 'tous-boivent':
@@ -756,11 +788,11 @@ function resolveCell(p, cell) {
       broadcast();
       break;
     case 'question':
-      setPending({ type: 'ok', playerId: p.id, label: `${cell.label} (réponds ou bois 3)` },
+      setPending({ type: 'ok', playerId: p.id, purpose: 'refusable', label: `${cell.label} — réponds à voix haute, ou bois 3 gorgées` },
         { kind: 'action', icon: '❓', playerId: p.id, text: `${p.name} — ${cell.label} Réponse ou 3 gorgées !` });
       break;
     case 'ficha':
-      setPending({ type: 'ok', playerId: p.id, label: `${cell.label} (ou bois 3)` },
+      setPending({ type: 'ok', playerId: p.id, purpose: 'refusable', label: `${cell.label} — montre-le à la table, ou bois 3 gorgées` },
         { kind: 'action', icon: '📸', playerId: p.id, text: `${p.name} — ${cell.label} ! Refus = 3 gorgées` });
       break;
     case 'change-recipient':
@@ -770,6 +802,8 @@ function resolveCell(p, cell) {
     case 'carte': {
       const card = draw();
       p.hand.push(card);
+      p.shownHand = p.hand.length;
+      notice(p, `Tu as pioché ${card.icon} ${card.title} : ${card.text}`, '🃏');
       io.to('screens').emit('card-draw', { playerId: p.id });
       bannerThenNext({ kind: 'card', icon: '🃏', playerId: p.id, voice: true, text: `${p.name} pioche une carte mystère…` }, 3200);
       break;
@@ -791,9 +825,13 @@ function playCard(p, cardId, payload) {
   const idx = p.hand.findIndex(c => c.id === cardId);
   if (idx === -1) return;
   const card = p.hand[idx];
+  // chaque refus est expliqué au joueur (plus de bouton qui « ne fait rien »)
+  const refuse = (why) => { notice(p, `${card.icon} ${card.title} : ${why}`, '⛔'); };
   // bloqué pendant les décisions collectives, les votes et les déplacements en cours
-  if (game.collect || game.vote) return;
-  if (game.awaitingAnim && (cardId === 'turbo' || cardId === 'putsch')) return;
+  if (game.collect) return refuse('attends la fin de la décision de la table.');
+  if (game.vote) return refuse('attends la fin du vote.');
+  if (game.awaitingAnim && (cardId === 'turbo' || cardId === 'putsch')) return refuse('attends que le pion ait fini de bouger.');
+  if (p.finished && (cardId === 'turbo' || cardId === 'putsch')) return refuse('tu es déjà à l\'arrivée, ton pion ne bouge plus.');
   const N = game.board.cells.length;
 
   const discard = () => { p.hand.splice(idx, 1); game.discard.push(card); broadcast(); };
@@ -814,7 +852,7 @@ function playCard(p, cardId, payload) {
         const t = byId(parseInt(idStr, 10));
         if (t && t.id !== p.id && n > 0) { parts.push([t, n]); total += n; }
       }
-      if (total !== 5) return;
+      if (total !== 5) return refuse('il faut distribuer exactement 5 gorgées.');
       discard();
       for (const [t, n] of parts) applyDrink(t, { g: n }, card.title);
       cardEvent({ kind: 'drink', icon: '🫗', playerId: p.id, text: `${p.name} joue GÉNÉREUX : ${parts.map(([t, n]) => `${t.name} ×${n}`).join(', ')}` });
@@ -849,35 +887,37 @@ function playCard(p, cardId, payload) {
     }
     case 'putsch': {
       const opts = players.filter(x => x.id !== p.id && !x.finished);
-      if (!opts.length) return;
+      if (!opts.length) return refuse('personne d\'autre en course.');
       discard();
       const t = opts[Math.floor(Math.random() * opts.length)];
       const tmp = t.pos; t.pos = p.pos; p.pos = tmp;
-      cardEvent({ kind: 'move', icon: '♟️', playerId: p.id, text: `${p.name} joue PUTSCH : le hasard désigne ${t.name}, ils échangent leurs places !` });
+      cardEvent({ kind: 'move', icon: '♟️', playerId: p.id, text: `${p.name} joue PUTSCH : le hasard désigne ${t.name}, ils échangent leurs places (case ${p.pos + 1} ↔ ${t.pos + 1}, sans effet de case) !` });
       break;
     }
     case 'bombe': {
       const cellIdx = parseInt(payload && payload.cell, 10);
-      if (isNaN(cellIdx) || cellIdx < 1 || cellIdx > N - 2) return;
-      if (players.some(x => x.pos === cellIdx)) return;          // case occupée
-      if (game.traps.some(t => t.cell === cellIdx)) return;       // déjà piégée
+      if (isNaN(cellIdx) || cellIdx < 1 || cellIdx > N - 2) return refuse('case invalide.');
+      if (players.some(x => x.pos === cellIdx)) return refuse(`la case ${cellIdx + 1} n'est plus vide, choisis-en une autre.`);
+      if (game.traps.some(t => t.cell === cellIdx)) return refuse(`la case ${cellIdx + 1} est déjà piégée.`);
       discard();
       game.traps.push({ cell: cellIdx });
-      cardEvent({ kind: 'status', icon: '💣', text: `Quelqu'un a posé une bombe sur la case ${cellIdx + 1}…` });
+      cardEvent({ kind: 'status', icon: '💣', text: `Quelqu'un a posé une bombe sur la case ${cellIdx + 1}… le premier qui s'y arrête boit ${shotTxt()} !` });
       break;
     }
     case 'menottes': {
       const a = byId(parseInt(payload && payload.a, 10));
       const b = byId(parseInt(payload && payload.b, 10));
-      if (!a || !b || a.id === b.id) return;
+      if (!a || !b || a.id === b.id) return refuse('choisis deux joueurs différents.');
       discard();
-      game.chains.push({ a: a.id, b: b.id, turnsLeft: game.order.length });
+      // 1 tour de table = un tour pour chaque joueur encore en course
+      game.chains.push({ a: a.id, b: b.id, turnsLeft: activeCount() });
       cardEvent({ kind: 'status', icon: '⛓️', text: `Quelqu'un a menotté ${a.name} et ${b.name} pour 1 tour : quand l'un boit, l'autre boit !` });
       break;
     }
     case 'corbeau': {
       const text = String(payload && payload.text || '').slice(0, 90).trim();
-      if (!text) return;
+      if (!text) return refuse('écris un message.');
+      if (p.corbeau) return refuse('envoie d\'abord ton corbeau en attente.');
       discard();
       p.corbeau = text;
       cardEvent({ kind: 'info', icon: '💌', text: 'Un corbeau a été écrit quelque part…' });
@@ -885,7 +925,7 @@ function playCard(p, cardId, payload) {
     }
     case 'rejoue': {
       // seulement à ton tour, avant de lancer le dé
-      if (!game.pending || game.pending.type !== 'roll' || game.pending.playerId !== p.id) return;
+      if (!game.pending || game.pending.type !== 'roll' || game.pending.playerId !== p.id) return refuse('se joue seulement à ton tour, avant de lancer le dé.');
       discard();
       game.extraTurn = p.id;
       cardEvent({ kind: 'status', icon: '🔁', playerId: p.id, text: `${p.name} joue REJOUE : deux tours d'affilée !` });
@@ -893,7 +933,9 @@ function playCard(p, cardId, payload) {
     }
     case 'ancre': {
       const t = byId(parseInt(payload && payload.target, 10));
-      if (!t || t.id === p.id) return;
+      if (!t || t.id === p.id) return refuse('choisis un autre joueur.');
+      if (t.finished) return refuse(`${t.name} est déjà arrivé·e, il/elle ne lance plus le dé.`);
+      if (t.ancre) return refuse(`${t.name} a déjà une ancre.`);
       discard();
       t.ancre = true;
       cardEvent({ kind: 'status', icon: '⚓', playerId: t.id, text: `${p.name} jette l'ancre sur ${t.name} : son prochain dé sera divisé par deux !` });
@@ -901,11 +943,13 @@ function playCard(p, cardId, payload) {
     }
     case 'vol': {
       const t = byId(parseInt(payload && payload.target, 10));
-      if (!t || t.id === p.id) return;
+      if (!t || t.id === p.id) return refuse('choisis un autre joueur.');
       discard();
       if (t.hand.length) {
         const stolen = t.hand.splice(Math.floor(Math.random() * t.hand.length), 1)[0];
         p.hand.push(stolen);
+        notice(p, `Tu as volé ${stolen.icon} ${stolen.title} à ${t.name} !`, '🕵️');
+        notice(t, `On t'a volé ${stolen.icon} ${stolen.title}… mais qui ?`, '🕵️');
         cardEvent({ kind: 'status', icon: '🕵️', text: `Une carte a été dérobée à ${t.name} !` });
       } else {
         cardEvent({ kind: 'info', icon: '🕵️', text: `Tentative de vol sur ${t.name}… aucune carte en poche, raté !` });
@@ -914,10 +958,10 @@ function playCard(p, cardId, payload) {
     }
     case 'bouclier': {
       const ld = p.lastDrink;
-      if (!ld || ld.used) return;
+      if (!ld || ld.used) return refuse('rien à annuler : se joue quand tu reçois à boire.');
       discard();
       ld.used = true;
-      p.gorgees -= ld.g; p.shots -= ld.s;
+      p.gorgees -= ld.g; p.shots -= ld.s; p.finis -= (ld.fini || 0);
       p.totalGorgees -= ld.g; p.totalShots -= ld.s;
       cardEvent({ kind: 'status', icon: '🛡️', playerId: p.id, text: `${p.name} bloque tout avec le BOUCLIER !` });
       break;
@@ -925,12 +969,13 @@ function playCard(p, cardId, payload) {
     case 'miroir': {
       const ld = p.lastDrink;
       const t = byId(parseInt(payload && payload.target, 10));
-      if (!ld || ld.used || !t || t.id === p.id) return;
+      if (!ld || ld.used) return refuse('rien à renvoyer : se joue quand tu reçois à boire.');
+      if (!t || t.id === p.id) return refuse('choisis sur qui renvoyer.');
       discard();
       ld.used = true;
-      p.gorgees -= ld.g; p.shots -= ld.s;
+      p.gorgees -= ld.g; p.shots -= ld.s; p.finis -= (ld.fini || 0);
       p.totalGorgees -= ld.g; p.totalShots -= ld.s;
-      applyDrink(t, { g: ld.g, s: ld.s }, 'Miroir');
+      applyDrink(t, { g: ld.g, s: ld.s, fini: ld.fini || 0 }, 'Miroir');
       cardEvent({ kind: 'drink', icon: '🪞', playerId: t.id, text: `${p.name} renvoie tout sur ${t.name} avec le MIROIR !` });
       break;
     }
@@ -1080,8 +1125,9 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
-  socket.on('anim-done', () => {
+  socket.on('anim-done', (doneId) => {
     if (game && game.awaitingAnim) {
+      if (doneId !== undefined && doneId !== null && doneId !== game.awaitingAnim.playerId) return;
       const p = byId(game.awaitingAnim.playerId);
       game.awaitingAnim = null;
       if (p) arrive(p);
@@ -1124,7 +1170,7 @@ io.on('connection', (socket) => {
     game.pending = null;
     if (purpose === 'mot') {
       game.motInterdit = { by: p.id, word: text };
-      bannerThenNext({ kind: 'status', icon: '🤫', playerId: p.id, text: `MOT INTERDIT : « ${text} » — celui qui le dit boit 1 shot (valable 1 tour complet) !` });
+      bannerThenNext({ kind: 'status', icon: '🤫', playerId: p.id, text: `MOT INTERDIT : « ${text} » — celui qui le dit boit ${shotTxt()} (valable 1 tour complet) !` });
     } else if (purpose === 'regle') {
       game.rules.push({ by: p.name, byId: p.id, text, expiresOnTurnOf: p.id });
       bannerThenNext({ kind: 'status', icon: '📜', playerId: p.id, text: `Nouvelle règle de ${p.name} (1 tour) : « ${text} »` });
@@ -1242,11 +1288,17 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('ok', () => {
+  socket.on('ok', (choice) => {
     const p = me();
     if (!p || !game || !game.pending || game.pending.type !== 'ok' || game.pending.playerId !== p.id) return;
     cancelVoteFor(p);
+    const refusable = game.pending.purpose === 'refusable';
     game.pending = null;
+    if (refusable && choice === 'refuse') {
+      applyDrink(p, { g: 3 }, 'Refus de gage');
+      bannerThenNext({ kind: 'drink', icon: '🙊', playerId: p.id, text: `${p.name} refuse et boit 3 gorgées !` });
+      return;
+    }
     broadcast();
     after(600, nextTurn);
   });
@@ -1254,7 +1306,7 @@ io.on('connection', (socket) => {
   socket.on('send-corbeau', () => {
     const p = me();
     if (!p || !game || game.phase !== 'playing' || !p.corbeau) return;
-    game.corbeaux.push({ text: p.corbeau, turnsLeft: game.order.length });
+    game.corbeaux.push({ text: p.corbeau, turnsLeft: activeCount() });
     p.corbeau = null;
     event({ kind: 'status', icon: '💌', voice: true, text: `CORBEAU anonyme : « ${game.corbeaux[game.corbeaux.length - 1].text} »` });
     broadcast();

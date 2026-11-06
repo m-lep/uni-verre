@@ -181,25 +181,25 @@ function generateBoard(seed) {
 
 // ——— Cartes Mystère ———
 // Chaque joueur démarre avec 2 cartes ; la case 🃏 en fait piocher une.
-// kind: instant (effet immédiat), window (fenêtre de 9 s après avoir reçu à
-// boire). needs: ce que le joueur doit choisir avant de jouer la carte.
+// kind: instant (effet immédiat), window (proposée quand on reçoit à boire,
+// valable sur la dernière boisson reçue). needs: ce que le joueur doit choisir avant de jouer la carte.
 // anonymous: l'écran ne dit pas qui l'a jouée.
 const CARDS = [
-  { id: 'tous2', kind: 'instant', title: 'SANTÉ GÉNÉRALE', text: 'Tout le monde boit 2 gorgées', icon: '🌍', count: 3 },
-  { id: 'dist5', kind: 'instant', title: 'GÉNÉREUX', text: 'Distribue 5 gorgées', icon: '🫗', count: 3, needs: 'alloc' },
-  { id: 'uni4', kind: 'instant', title: 'OFFRANDE', text: "+4 doses dans l'uni.verre", icon: '🏺', count: 2 },
-  { id: 'turbo', kind: 'instant', title: 'TURBO', text: "Avance de 3 cases (sans appliquer l'effet de la case)", icon: '🚀', count: 3 },
-  { id: 'premier3', kind: 'instant', title: 'IMPÔT SUR LA FORTUNE', text: 'Le 1er du plateau boit 3', icon: '👑', count: 2 },
-  { id: 'dernier3', kind: 'instant', title: 'DOUBLE PEINE', text: 'Le dernier du plateau boit 3', icon: '🐢', count: 2 },
-  { id: 'putsch', kind: 'instant', title: 'PUTSCH', text: 'Échange ta position avec un joueur tiré au hasard', icon: '♟️', count: 2 },
-  { id: 'bombe', kind: 'instant', title: 'BOMBE PIÉGÉE', text: 'Pose une bombe sur une case vide : le premier qui y tombe boit 1 shot', icon: '💣', count: 3, needs: 'cell', anonymous: true },
-  { id: 'menottes', kind: 'instant', title: 'MENOTTES', text: 'Lie deux joueurs pendant 1 tour complet : quand l\'un boit, l\'autre boit autant', icon: '⛓️', count: 2, needs: 'pair', anonymous: true },
+  { id: 'tous2', kind: 'instant', title: 'SANTÉ GÉNÉRALE', text: 'Tout le monde boit 2 gorgées, toi compris', icon: '🌍', count: 3 },
+  { id: 'dist5', kind: 'instant', title: 'GÉNÉREUX', text: 'Distribue 5 gorgées aux autres joueurs, comme tu veux', icon: '🫗', count: 3, needs: 'alloc' },
+  { id: 'uni4', kind: 'instant', title: 'OFFRANDE', text: "Verse 4 doses dans l'UNI.VERRE (le dernier le boira)", icon: '🏺', count: 2 },
+  { id: 'turbo', kind: 'instant', title: 'TURBO', text: "Avance de 3 cases, sans appliquer l'effet de la case (ne mène jamais sur l'arrivée)", icon: '🚀', count: 3 },
+  { id: 'premier3', kind: 'instant', title: 'IMPÔT SUR LA FORTUNE', text: 'Le joueur le plus avancé du plateau boit 3 gorgées (même si c\'est toi)', icon: '👑', count: 2 },
+  { id: 'dernier3', kind: 'instant', title: 'DOUBLE PEINE', text: 'Le joueur le moins avancé du plateau boit 3 gorgées (même si c\'est toi)', icon: '🐢', count: 2 },
+  { id: 'putsch', kind: 'instant', title: 'PUTSCH', text: 'Échange ta place avec un joueur encore en course tiré au hasard (sans effet de case)', icon: '♟️', count: 2 },
+  { id: 'bombe', kind: 'instant', title: 'BOMBE PIÉGÉE', text: 'Pose une bombe sur une case vide : le premier qui s\'y arrête boit 1 shot', icon: '💣', count: 3, needs: 'cell', anonymous: true },
+  { id: 'menottes', kind: 'instant', title: 'MENOTTES', text: 'Lie deux joueurs pendant 1 tour de table : quand l\'un boit, l\'autre boit autant', icon: '⛓️', count: 2, needs: 'pair', anonymous: true },
   { id: 'vol', kind: 'instant', title: 'VOL À LA TIRE', text: 'Vole une carte au hasard à un joueur. S\'il n\'en a pas : raté, pas de seconde chance', icon: '🕵️', count: 3, needs: 'player', anonymous: true },
   { id: 'corbeau', kind: 'instant', title: 'CORBEAU', text: 'Écris un message anonyme, puis envoie-le à l\'écran quand tu veux (plus tard si tu préfères)', icon: '💌', count: 2, needs: 'message', anonymous: true },
   { id: 'rejoue', kind: 'instant', title: 'REJOUE', text: 'À jouer à ton tour, avant de lancer le dé : tu enchaîneras un deuxième tour complet', icon: '🔁', count: 2 },
   { id: 'ancre', kind: 'instant', title: 'ANCRE', text: 'Le prochain lancer de dé du joueur visé est divisé par deux', icon: '⚓', count: 2, needs: 'player' },
-  { id: 'bouclier', kind: 'window', title: 'BOUCLIER', text: 'Quand tu reçois à boire, tu peux tout annuler', icon: '🛡️', count: 2 },
-  { id: 'miroir', kind: 'window', title: 'MIROIR', text: 'Quand tu reçois à boire, tu peux tout renvoyer sur un joueur de ton choix', icon: '🪞', count: 2, needs: 'player' },
+  { id: 'bouclier', kind: 'window', title: 'BOUCLIER', text: 'Quand tu reçois à boire, annule tout ce que tu viens de recevoir', icon: '🛡️', count: 2 },
+  { id: 'miroir', kind: 'window', title: 'MIROIR', text: 'Quand tu reçois à boire, renvoie tout sur le joueur de ton choix', icon: '🪞', count: 2, needs: 'player' },
 ];
 
 function makeDeck(seed) {

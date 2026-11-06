@@ -169,7 +169,7 @@ function buildBoard(cells) {
     gCells.appendChild(num);
 
     // libellé seul (sans emoji : lisibilité maximale), contour sombre
-    const lines = wrapLabel(cell.label);
+    const lines = wrapLabel(displayLabel(cell));
     const fs = lines.length >= 3 ? 20.5 : 24;
     lines.forEach((line, li) => {
       const t = document.createElementNS(NS, 'text');
@@ -205,6 +205,11 @@ function buildBoard(cells) {
     `;
     gCenter.appendChild(g);
   }
+}
+
+function displayLabel(cell) {
+  if (snap && snap.noShots) return cell.label.replace(/1 SHOT/g, '5 GORGÉES');
+  return cell.label;
 }
 
 function wrapLabel(label) {
@@ -303,7 +308,7 @@ function renderPawns() {
 
 function animateMove(playerId, from, to) {
   const el = document.getElementById(`pawn-${playerId}`);
-  if (!el) { socket.emit('anim-done'); return; }
+  if (!el) { socket.emit('anim-done', playerId); return; }
   animating.add(playerId);
   const dir = to > from ? 1 : -1;
   let cur = from;
@@ -317,10 +322,10 @@ function animateMove(playerId, from, to) {
       animating.delete(playerId);
       renderPawns();
       landRipple(to);
-      socket.emit('anim-done');
+      socket.emit('anim-done', playerId);
     }, 260);
   };
-  if (from === to) { animating.delete(playerId); socket.emit('anim-done'); return; }
+  if (from === to) { animating.delete(playerId); socket.emit('anim-done', playerId); return; }
   step();
 }
 
@@ -412,12 +417,19 @@ function renderSide() {
   }
   if (snap.motInterdit) {
     const by = snap.players.find(p => p.id === snap.motInterdit.by);
-    chips.push(`🤫 MOT INTERDIT : « <b>${esc(snap.motInterdit.word)}</b> » (posé par ${esc(by ? by.name : '?')}) — le dire = 1 shot !`);
+    chips.push(`🤫 MOT INTERDIT : « <b>${esc(snap.motInterdit.word)}</b> » (posé par ${esc(by ? by.name : '?')}) — le dire = ${snap.noShots ? '5 gorgées' : '1 shot'} ! Balancez sur vos téléphones`);
   }
   if (snap.freeze) {
     const by = snap.players.find(p => p.id === snap.freeze.by);
-    chips.push(`🥶 FREEZE armé par ${esc(by ? by.name : '?')} — quand il/elle s'arrête, le dernier immobile boit ${snap.freeze.n} !`);
+    chips.push(`🥶 FREEZE armé par ${esc(by ? by.name : '?')} — dès qu'il/elle se fige, figez-vous : le dernier immobile boit ${snap.freeze.n} !`);
   }
+  for (const p of snap.players) {
+    if (p.boitPourTous) chips.push(`🐫 <b>${esc(p.name)}</b> boit à la place de tout le monde jusqu'à son prochain tour`);
+    if (p.frozen) chips.push(`❄️ <b>${esc(p.name)}</b> est gelé·e : passe son prochain tour`);
+    if (p.ancre) chips.push(`⚓ Prochain dé de <b>${esc(p.name)}</b> divisé par deux`);
+  }
+  const nTraps = (snap.traps || []).length;
+  if (nTraps) chips.push(`💣 ${nTraps} bombe${nTraps > 1 ? 's' : ''} piégée${nTraps > 1 ? 's' : ''} sur le plateau : s'y arrêter = ${snap.noShots ? '5 gorgées' : '1 shot'}`);
   for (const cb of snap.corbeaux || []) {
     chips.push(`💌 Corbeau anonyme : « ${esc(cb)} »`);
   }
@@ -719,8 +731,9 @@ socket.on('connect', () => socket.emit('register-screen'));
 
 socket.on('game', (s) => {
   snap = s;
-  if (s.seed !== boardSeed) {
-    boardSeed = s.seed;
+  const boardKey = s.seed + (s.noShots ? ':ns' : '');
+  if (boardKey !== boardSeed) {
+    boardSeed = boardKey;
     buildBoard(s.board);
     animating.clear();
   }

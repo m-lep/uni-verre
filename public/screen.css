@@ -228,7 +228,7 @@ body.shake { animation: bigShake .5s; }
   80% { transform: translate(8px, 6px); }
 }
 
-#lobbyTable { width: min(560px, 80vw); }
+#lobbyTable { width: min(480px, 70vw); }
 #lobbySeated { font-size: 16px; font-weight: 600; color: #ffd98a; }
 
 #boomFlash { position: fixed; inset: 0; background: #fff; z-index: 60; animation: boom .5s forwards; }
@@ -252,9 +252,9 @@ body.shake { animation: bigShake .5s; }
   border-radius: 28px; padding: 34px 60px;
   box-shadow: 0 30px 80px rgba(0,0,0,.6);
 }
-.lobbyTitle { font-family: 'Bebas Neue', sans-serif; font-size: 110px; letter-spacing: 10px; color: var(--gold); text-shadow: 0 6px 0 #000; }
+.lobbyTitle { font-family: 'Bebas Neue', sans-serif; font-size: 84px; letter-spacing: 10px; color: var(--gold); text-shadow: 0 6px 0 #000; }
 .lobbySub { font-size: 22px; opacity: .85; }
-#qr { width: 240px; height: 240px; border-radius: 18px; border: 6px solid var(--gold); background: #fff; }
+#qr { width: 210px; height: 210px; border-radius: 18px; border: 6px solid var(--gold); background: #fff; }
 #joinUrl { font-size: 26px; font-weight: 600; letter-spacing: 1px; color: #ffd98a; }
 
 .lobbyHint { font-size: 16px; opacity: .7; line-height: 1.6; text-align: center; }
@@ -277,3 +277,11 @@ body.shake { animation: bigShake .5s; }
 }
 .fstat img { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; }
 .fstat b { font-size: 16px; }
+
+#howTo { display: grid; grid-template-columns: repeat(4, minmax(0, 190px)); gap: 10px; text-align: left; }
+#howTo > div {
+  background: rgba(255,255,255,.06); border: 1px solid rgba(232,200,119,.25);
+  border-radius: 14px; padding: 10px 12px; font-size: 13px; line-height: 1.45; opacity: .92;
+}
+#howTo b:first-child { display: block; font-size: 14.5px; color: var(--gold); margin-bottom: 3px; }
+.statusChip b { color: #fff3d6; }
